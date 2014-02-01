@@ -9,6 +9,7 @@ Created on Jan 29, 2014
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import os.path
 
 PLAYER_DEFAULT = {}
@@ -44,7 +45,8 @@ class SetPlayers(object):
 
         '''
 
-        self.players = self.custom._getPlayersDraft()
+        players = self.custom._getPlayersDraft()
+        self._cleanPlayers(players)
 
         return(self.players)
 
@@ -53,16 +55,41 @@ class SetPlayers(object):
         Returns player from database for draft as defined in league and profile
         '''
 
-        self.players = self.past._getPlayersDraft()
+        players = self.past._getPlayersDraft()
+        self._cleanPlayers(players)
 
         return(self.players)
 
-    def plotPlayerStats(self, columns=[], players=pd.DataFrame()):
+    def _cleanPlayers(self, players):
         '''
-        Plot specified columns for player dataframe.
+        Higher/Common level player customization is done here
+        - Don't want redundancy between Custom and Database classes
         '''
 
-        pass
+        players.pts = players.pts.apply(np.round)
+        self.players = players
+
+    def plotPtsByPos(self, players=pd.DataFrame()):
+
+        '''
+        Plot pts (keep default order) by positon
+        '''
+
+        if players.empty:
+            players = self.players
+
+        all_pos = players.pos.unique()
+
+        plt.figure()
+        for pos in all_pos:
+            plt.plot(players.pts[players.pos == pos])
+
+        plt.legend(all_pos)
+        plt.grid()
+        plt.xlabel('player rank')
+        plt.ylabel('fantasy pts')
+        plt.title('Fantasy Pts by Position')
+        plt.show()
 
 
 class Artificial:
@@ -93,6 +120,8 @@ class Artificial:
         '''
         Set general class initial conditions.
         '''
+
+        self.SCALE_COEFF_2 = 0.1
 
         global PLAYER_DEFAULT
 
@@ -158,6 +187,8 @@ class Artificial:
         (1) random noise and (2) amplification at high values (3) matlab code
 
         '''
+
+        coeff[2] = self.SCALE_COEFF_2 * coeff[2]
 
         pts = np.exp(-coeff[2] * arr + coeff[1]) + coeff[0] - np.exp(coeff[1])
 
@@ -256,7 +287,6 @@ class Database:
             else:
                 players = players.append(keep)
 
-        players.pts = players.pts.apply(np.round)
         return(players)
 
     def _cleanStats(self, stats_raw):
@@ -271,23 +301,23 @@ class Database:
         stats_raw = stats_raw.drop(self.settings['remove'], axis=1)
 
         # 2. Apply mapping header
-        # TODO: Add a warning if a columnn is empty in stats_raw
-        #       - i,e. fumL
+        # TODO: Add a warning if a columnn is empty in stats_raw [fumL]
         stats_raw.columns = self.settings['header']
 
         # 3. Create new stats header
         stats = pd.DataFrame(columns=self.stat_col, index=stats_raw.index)
 
         # 4. Map raw stats to new stats data
-        # TODO: Add an exception - this is risky and will cause errors if not
-        #       mapped properly
+        # TODO: Add exception - risky will cause errors if not mapped properly
         stats[stats_raw.columns] = stats_raw
 
         # 3. fill na with 0
         stats = stats.fillna(0)
 
         # 4. Clean up names
+        # WARN: Below strips some mumbers and sets them to nan
         stats.name = stats.name.str.replace('[-+!@#$%^&*]', '')
+        stats = stats.dropna()
 
         # 5. Generate id as index
         stats = self._setIndexFromName(stats)

@@ -1,4 +1,7 @@
 '''
+Set State - Provides common space to set object conditions - Strong Dependency
+==============================================================================
+
 Created on Jan 29, 2014
 
 @author: rpatel
@@ -7,12 +10,30 @@ Created on Jan 29, 2014
 
 class State(object):
     '''
-    classdocs
+    Use this object to update the state of all other objects this package.
+
+    Contains objects that set the state of all other classes. It is very
+    important to only use this class to set or initialize as all other
+    classes use this to grab/set/creat/modify their own parameters.
+
+    Example:
+    Need player stats from database of players between a range of years.
+    (1) Create a method (in Projections Class) that will...
+    (1) Set the profile struct in State.profile to point to the desired year
+    (2) Grab the player stats using Player Class
+    (3) Set the profile to the next year and Grab (again) player stats
+    (4) Projection Class can now manipulate the player struct as pleases
+
+    Note:
+    This is the best way I could think of of having a single entity that can
+    control all other objects cleanly from one location.  At another time when
+    several instances of objects (derived from the same class) need to go exist
+    this method may no longer suffice.
     '''
 
     def __init__(self, LeagueSettings={}, ProfileSetup={}):
         '''
-        Constructor
+        Pass desired settings when initializing otherwise use internal default.
         '''
 
         self.league = League(LeagueSettings)
@@ -21,14 +42,25 @@ class State(object):
 
 class Profile:
     '''
-    asfaf
+    Sets conditions for the following classes:
+    1. Player Profile
+    2. More to come...
     '''
 
     def __init__(self, settings={}):
+        '''
+        Set up class defaults and base settings
+        - USE SETUP method to update settings
+        - OR modify individual settings (this maybe dangerous)
+        '''
+
         self._set_player_default()
         self.setup(settings)
 
     def _set_player_default(self):
+        '''
+        Set Default settings in case no settings are provided
+        '''
 
         # Project Players
 
@@ -52,20 +84,24 @@ class Profile:
         # Custom Players
         custom = {
                 #  pos   os    m1  m2  type
-                  'QB': [500,  6,  1, 'exp'],
-                  'RB': [400, -30, 0, 'poly'],
-                  'WR': [300, -20, 0, 'poly'],
-                  'TE': [250, -10, 0, 'poly'],
-                  'DE': [300, -10, 0, 'poly'],
-                  'K':  [200, -5,  0, 'poly'],
+                  'QB': [250, +4.5, .85, 'exp'],
+                  'RB': [300, +5.2, .80, 'exp'],
+                  'WR': [175, +5.0, .20, 'exp'],
+                  'TE': [125, +4.5, .99, 'exp'],
+                  'DE': [300, -6.0, .00, 'poly'],
+                  'K':  [200, -6.0, .00, 'poly'],
                   }
 
         self.PLAYERS_DATABASE_DEFAULT = database
         self.PLAYERS_CUSTOM_DEFAULT = custom
 
     def setup(self, settings):
+        '''
+        Pass settings to update class here otherwise default are used
+        '''
 
         # setup players
+        # TODO: Need to throw an exception if struct are not set up correctly
         if not 'player_custom' in settings:
             self.player_custom = self.PLAYERS_CUSTOM_DEFAULT
 
@@ -75,26 +111,31 @@ class Profile:
 
 class League:
     '''
-    classdocs
+    General League Parameters are stored here.  Everything will reside here.
+    To re-run a new draft after already initialized currently most modify
+    parameters directly [need to change this]
     '''
 
     def __init__(self, settings={}):
         '''
-        Constructor
+        General object setup.
         '''
 
         self._set_default()
         self.setup(settings)
 
     def _set_default(self):
+        '''
+        Load default settings in case none are provided
+        '''
 
         self.DEFAULT_SETTINGS = {}
 
         roster = {
-                  'QB': 1,
-                  'RB': 2,
-                  'WR': 2,
-                  'TE': 1,
+                  'QB': 4,
+                  'RB': 4,
+                  'WR': 4,
+                  'TE': 4,
                   }
 
         points = {
@@ -127,8 +168,11 @@ class League:
 
     def setup(self, settings):
         '''
-        asfasf
+        Defines some constant parameters based off of parameters for league.
         '''
+
+        # TODO: FORCE method to update league parameters once initial settings
+        #       are modified
 
         if not settings:
             settings = self.DEFAULT_SETTINGS
