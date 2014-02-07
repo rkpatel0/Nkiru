@@ -12,78 +12,59 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os.path
 
-PLAYER_DEFAULT = {}
-PLAYER_DEFAULT['fant_col'] = ['name', 'pos', 'preRank', 'pts']
 
-
-class SetPlayers(object):
+class Player(object):
     '''
-    Top level (wrapper) class to define different types of players. Must pass
-    the 'info' object (1) league (2) player settings to set player generation.
-
-    This should be the only class required to grab players.
-
-    TODO: Work on a clean/simple UI for setting (1) DataBase (2) Articial
-          palyers up.
+    SubClass to Database and Artificial Player Classes.  In general, this class
+    should never be directly called.  Let Database and Artificial Player
+    Classes call this class and set any needed properties.
     '''
 
     def __init__(self, info):
         '''
         Pass object to setup Arificial and Database player generator.  Even if
         both are not being used both need to be set up.  Using 'info' default
-        settings will be passed so one need not directly initialize explicity.
+        database will be passed so one need not directly initialize explicity.
+        '''
+        pass
 
+        #self.custom = Artificial(info.league, info.profile.player_custom)
+        #self.past = Database(info.league, info.profile.player_database)
+
+    def _set_player_defaults(self):
+        '''
+        Set all player (general) default values here.  This must specifically
+        be called by sub class!
+
+        RKP: Could we make this be auto-called on initialization?
         '''
 
-        self.info = info
-        self.custom = Artificial(info.league, info.profile.player_custom)
-        self.past = Database(info.league, info.profile.player_database)
+        self.PLAYER_DEFAULT = {}
+        self.PLAYER_DEFAULT['draft'] = ['name', 'pos', 'preRank', 'pts']
 
-    def get_customDraft(self):
+    def _set_for_draft(self):
         '''
-        Returns custom-defined players as defined in league and profile objects
-
+        Keeps all sub-player classes synced
         '''
 
-        players = self.custom._getPlayersDraft()
-        self._cleanPlayers(players)
+        self.players.pts = self.players.pts.apply(np.round)
+        self.players = self.players.sort(columns='preRank')
 
-        return(self.players)
-
-    def get_databaseDraft(self):
-        '''
-        Returns player from database for draft as defined in league and profile
-        '''
-
-        players = self.past._getPlayersDraft()
-        self._cleanPlayers(players)
-
-        return(self.players)
-
-    def _cleanPlayers(self, players):
-        '''
-        Higher/Common level player customization is done here
-        - Don't want redundancy between Custom and Database classes
-        '''
-
-        players.pts = players.pts.apply(np.round)
-
-        self.players = players.sort(columns='preRank')
-
-    def plotPtsByPos(self, players=pd.DataFrame()):
+    def plot_position_points(self):
 
         '''
-        Plot pts (keep default order) by positon
+        Plot pts (keep default order) by positon.  Must be called AFTER players
+        have been generated!
         '''
 
-        if players.empty:
-            players = self.players
-
-        all_pos = players.pos.unique()
+        try:
+            all_pos = self.players.pos.unique()
+        except NameError:
+            raise NameError('Need to create players before plotting!')
 
         plt.figure()
         for pos in all_pos:
-            plt.plot(players.pts[players.pos == pos])
+            plt.plot(self.players.pts[self.players.pos == pos])
 
         plt.legend(all_pos)
         plt.grid()
@@ -93,52 +74,38 @@ class SetPlayers(object):
         plt.show()
 
 
-class Artificial:
+class Artificial(Player):
     '''
     Create custom defined players by passing slopes and offet.  Can create
     players with (1) polynomial decay (2) exponential decay.
-
-
     '''
+    def __init__(self, info):
 
-    def __init__(self, league, profile_coeff):
-        '''
-        Set class on initialziation for simple one-time-use or use setup to
-        reset object for grabbing differnt player profiles.
-
-        Remember:
-        If you modify league settings you modify player profile info.  This is
-        the recommended way to update player profile to grab a different
-        player profile.
-
-        '''
-
-        self.league = league
-        self.profile_coeff = profile_coeff
+        self.league = info.league
+        self.player_equation = info.profile.player_custom
+        self._set_player_defaults()
         self._setup()
 
     def _setup(self):
         '''
         Set general class initial conditions.
         '''
-
         self.SCALE_COEFF_2 = 0.1
 
-        global PLAYER_DEFAULT
-
-    def _getPlayersDraft(self):
+    def _generate(self):
         '''
         Return a data frame with structure designed for draft-specific needs.
         '''
 
-        players = pd.DataFrame(columns=PLAYER_DEFAULT['fant_col'],
+        players = pd.DataFrame(columns=self.PLAYER_DEFAULT['draft'],
                                index=np.arange(self.league.num_of_players))
 
         idx = 0
         for pos in self.league.roster.keys():
 
             num_of_pos = self.league.roster[pos] * self.league.num_of_teams
-            pts_by_pos = self._get_points(num_of_pos, self.profile_coeff[pos])
+            pts_by_pos = self._get_points(num_of_pos,
+                                          self.player_equation[pos])
 
             for j, pts in enumerate(pts_by_pos):
 
@@ -154,7 +121,7 @@ class Artificial:
 
     def _get_points(self, num_of_pos, coeff):
         '''
-        Returns a numpy array of pts as specified by profile-player-settings.
+        Returns a numpy array of pts as specified by profile-player-database.
         '''
 
         arr_of_pos = np.arange(num_of_pos)
@@ -208,31 +175,40 @@ class Artificial:
 
         return(pts)
 
+    def players_to_draft(self):
+        '''
+        Returns custom-defined players as defined in league and profile objects
+        '''
 
-class Database:
+        self.players = self._generate()
+        self._set_for_draft()
+
+        return(self.players)
+
+
+class Database(Player):
     '''
-    Get player stats (or points) as defined settings.  Either return players
+    Get player stats (or points) as defined database.  Either return players
     for fantasy specific purposes or projections.
 
-    Use info.league and info.settings to define desired database player stats.
+    Use info.league and info.database to define desired database player stats.
     '''
 
-    def __init__(self, league, settings):
+    def __init__(self, info):
         '''
-        Always pass settings on initializtion, then use those objects to define
+        Always pass database on initializtion, then use those objects to define
         desired player stats.
         '''
 
-        self.league = league
-        self.settings = settings
+        self.league = info.league
+        self.database = info.profile.player_database
+        self._set_player_defaults()
         self._setup()
 
     def _setup(self):
         '''
         Set general class initial conditions.
         '''
-
-        global PLAYER_DEFAULT
 
         # RKP: Is this really the final structure for stat-pts??
         self.stat_col = [
@@ -249,40 +225,36 @@ class Database:
         - Careful about post processing here - impacts pts + draft classes
         '''
 
-        stats = self._getStatsRaw()
-        stats = self._cleanStats(stats)
+        stats = self._read_from_database()
+        stats = self._clean_stats(stats)
 
         return(stats)
 
-    def _getPlayersDraft(self):
-
-        '''
-        Returns player dataframe for drafted-related analysis
-        '''
-        stats = self._getPlayerStats()
-        players = self._get_fantasy_points(stats)
-
-        return(players)
-
     def _get_fantasy_points(self, stats):
         '''
-        Return dataframe new data frame that:
+        Return dataframe that:
             (1) computets points form stats
             (2) converts stats frame to draft frame
+            (3) Perhaps we (just) want to compute fantasy points and append
+                then, under _draft_clean_up we only keep columns for draft
         '''
 
         for category in self.league.pts_per_stat.keys():
             stats.pts += (self.league.pts_per_stat[category] * stats[category])
 
         stats.sort(columns='pts', ascending=False, inplace=True)
-        players = pd.DataFrame(columns=PLAYER_DEFAULT['fant_col'])
+
+        return(stats)
+
+    def _stats_to_players(self, stats):
+
+        players = pd.DataFrame(columns=self.PLAYER_DEFAULT['draft'])
 
         # Remove excess players at each position + keep only draft categories
         for pos in self.league.positions:
             num = self.league.roster[pos] * self.league.num_of_teams
-            keep = stats[PLAYER_DEFAULT['fant_col']][stats.pos == pos][:num]
+            keep = stats[self.PLAYER_DEFAULT['draft']][stats.pos == pos][:num]
 
-            # TODO: Raise exception here instead...
             if len(keep) < num:
                 msg = 'ERROR NUMBER OF PLAYERS AT POS ARE NOT ENOUGHH!!'
                 raise ValueError(msg, keep)
@@ -291,7 +263,7 @@ class Database:
 
         return(players)
 
-    def _cleanStats(self, stats_raw):
+    def _clean_stats(self, stats_raw):
         '''
         Convert and clean raw database (.csv) file to readable stats file.
         - Maps raw database file to internally used format
@@ -300,11 +272,11 @@ class Database:
         '''
 
         # 1. Remove unnecessary database/raw columns
-        stats_raw = stats_raw.drop(self.settings['remove'], axis=1)
+        stats_raw = stats_raw.drop(self.database['remove'], axis=1)
 
         # 2. Map database/raw header to internal names
         try:
-            stats_raw.columns = self.settings['header']
+            stats_raw.columns = self.database['header']
         except Exception as ex:
             msg = 'Cannot map internal column format to raw stats data frame\n'
             template = ('Exception of type: {0} occured.\nArguments: {1!r}\n')
@@ -321,19 +293,18 @@ class Database:
             template = ('Exception of type: {0} occured.\nArguments: {1!r}\n')
             raise ValueError(msg + template.format(type(ex).__name__, ex.args))
 
-        # 5. Clean up stats
-        #    - Don't change Order
-        #    - Names get filld with numbers then get stripped back to nan
+        # 5. Clean up stats - Don't change Order
+        #    - Nan names get filled with numbers then back to nan when stripped
         stats = stats.fillna(0)
         stats.name = stats.name.str.replace('[-+!@#$%^&*]', '')
         stats = stats.dropna()
 
         # 6. Generate id as index
-        stats = self._setIndexFromName(stats)
+        stats = self._set_index(stats)
 
         return(stats)
 
-    def _setIndexFromName(self, stats):
+    def _set_index(self, stats):
         '''
         Create a unique ID from player name.
         *Caution: Need to add an exception for infinite while loop...
@@ -355,10 +326,9 @@ class Database:
                 abbr += str(ext)
                 check = abbr in nick_name
 
-                # TODO: make an exceptioon
+                # Raise if we can't create proper player IDs (should not occur)
                 if ext > 10:
-                    print 'ERROR SEEM TO BE STUCK....'
-                    break
+                    raise ValueError('Stuck inside infinite loop...')
 
             nick_name.append(abbr)
 
@@ -366,16 +336,27 @@ class Database:
 
         return(stats)
 
-    def _getStatsRaw(self):
+    def _read_from_database(self):
         '''
         Read file from data base and convert to generic data-frame
         '''
 
-        file_name = self.settings['file'][0] + self.settings['year'] + \
-                    self.settings['file'][1]
+        file_name = self.database['file'][0] + self.database['year'] + \
+                    self.database['file'][1]
 
-        file_path = os.path.join(self.settings['path'], file_name)
+        # RKP: Should we add a try here?
+        file_path = os.path.join(self.database['path'], file_name)
 
         stats = pd.read_csv(file_path)
 
         return(stats)
+
+    def players_to_draft(self):
+        '''
+        Get players from database
+        '''
+        stats = self._getPlayerStats()
+        self.players = self._get_fantasy_points(stats)
+        self._set_for_draft()
+
+        return(self.players)
