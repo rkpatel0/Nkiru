@@ -67,7 +67,8 @@ class SetPlayers(object):
         '''
 
         players.pts = players.pts.apply(np.round)
-        self.players = players
+
+        self.players = players.sort(columns='preRank')
 
     def plotPtsByPos(self, players=pd.DataFrame()):
 
@@ -283,7 +284,8 @@ class Database:
 
             # TODO: Raise exception here instead...
             if len(keep) < num:
-                print 'ERROR NUMBER OF PLAYERS AT POS ARE NOT ENOUGHH!!!!'
+                msg = 'ERROR NUMBER OF PLAYERS AT POS ARE NOT ENOUGHH!!'
+                raise ValueError(msg, keep)
             else:
                 players = players.append(keep)
 
@@ -297,29 +299,36 @@ class Database:
         - Actions specified below
         '''
 
-        # 1. Remove columns
+        # 1. Remove unnecessary database/raw columns
         stats_raw = stats_raw.drop(self.settings['remove'], axis=1)
 
-        # 2. Apply mapping header
-        # TODO: Add a warning if a columnn is empty in stats_raw [fumL]
-        stats_raw.columns = self.settings['header']
+        # 2. Map database/raw header to internal names
+        try:
+            stats_raw.columns = self.settings['header']
+        except Exception as ex:
+            msg = 'Cannot map internal column format to raw stats data frame\n'
+            template = ('Exception of type: {0} occured.\nArguments: {1!r}\n')
+            raise ValueError(msg + template.format(type(ex).__name__, ex.args))
 
-        # 3. Create new stats header
+        # 3. Create stats dataframe
         stats = pd.DataFrame(columns=self.stat_col, index=stats_raw.index)
 
-        # 4. Map raw stats to new stats data
-        # TODO: Add exception - risky will cause errors if not mapped properly
-        stats[stats_raw.columns] = stats_raw
+        # 4. Add data from raw stats (there is no .add_column function)
+        try:
+            stats[stats_raw.columns] = stats_raw
+        except Exception as ex:
+            msg = 'Cannot copy raw stats data to intneral format\n'
+            template = ('Exception of type: {0} occured.\nArguments: {1!r}\n')
+            raise ValueError(msg + template.format(type(ex).__name__, ex.args))
 
-        # 3. fill na with 0
+        # 5. Clean up stats
+        #    - Don't change Order
+        #    - Names get filld with numbers then get stripped back to nan
         stats = stats.fillna(0)
-
-        # 4. Clean up names
-        # WARN: Below strips some mumbers and sets them to nan
         stats.name = stats.name.str.replace('[-+!@#$%^&*]', '')
         stats = stats.dropna()
 
-        # 5. Generate id as index
+        # 6. Generate id as index
         stats = self._setIndexFromName(stats)
 
         return(stats)
