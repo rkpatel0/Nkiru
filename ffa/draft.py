@@ -50,8 +50,8 @@ class Simulator(object):
         Kick-off draft, return draft results object to analyize draft.
         '''
 
-        self.results = DraftResults(self.league.num_of_players)
-        players = self.players  # local copy that will get altered thru draft
+        players = self.players.copy()
+        self.results = DraftResults(players.index)
 
         for name in self._draft_order:
             select = self._select_player(name, players)
@@ -78,6 +78,8 @@ class Simulator(object):
             options = self._user_select_player(name, playersAv)
         elif profile[self.league.PROFILE_MAP['strategy']] == 'search':
             options = self._search_select_player(name, players)
+        else:
+            raise ValueError('Unknown type of team strategy selected!\n')
 
         if profile[self.league.PROFILE_MAP['tie']] == 'rand':
             select = random.choice(options[options == True].index)
@@ -85,6 +87,8 @@ class Simulator(object):
             select = options[options == True].index[0]
         elif profile[self.league.PROFILE_MAP['tie']] == 'last':
             select = options[options == True].index[-1]
+        else:
+            raise ValueError('Unknown type of team tie-breaker selected!\n')
 
         return(select)
 
@@ -92,11 +96,19 @@ class Simulator(object):
         '''
         Return a dictionary of positons that team still needs to draft. Based
         off of league roster and teams previous draft picks
+        
+        Note:
+        Only save positons that NEED TO BE DRAFTED, dictionary should not
+        contain ANY positions that need zero more players.  Because search
+        functions just look at keys of keep dictionary hence we're blind to
+        zero-valued positions.
         '''
 
         # TODO: Need to factor in flex picks...
-        keep = {}
         pos_count = results._count_positions(name, results)
+
+        # Keep cannot store any zer-valued positons
+        keep = {}
         for pos in self.league.positions:
             if pos in pos_count:
                 delta = self.league.roster[pos] - pos_count[pos]
@@ -104,7 +116,7 @@ class Simulator(object):
                     keep[pos] = delta
                 elif delta < 0:
                     raise ValueError('Game Over')
-            else:
+            elif self.league.roster[pos] != 0:
                 keep[pos] = self.league.roster[pos]
 
         return(keep)
@@ -170,37 +182,50 @@ class Simulator(object):
         while nodes:
             self._search_player_nodes(name, nodes, playerList, resultList)
 
-        options = self._search_get_best_options(players)
+        options = self._search_get_best_options(players, name)
 
         return(options)
 
-    def _search_get_best_options(self, players):
+    def _search_get_best_options(self, players, name):
         '''
         Return the best draft options for a given round.
         '''
 
         player_names = []
-        player_index = self.results.df.team.count()   # count any columns
+        team = self.results._get_team(name)
+        ROUND_INDEX = team.name.count() + 1
 
         # Get player name(s) for from the appropriate round
         for best in self.best_team:
-            player_names.append(best.df.name[player_index])
+            team = best._get_team(name)
+            keep_idx = team.rnd == ROUND_INDEX
+            player_names.append(team.name[keep_idx].ix[0])
 
         # TODO: raise some type of warning that there was a tie between players
         options = players.name.isin(player_names)
+
+        if not options.any():
+            raise ValueError('No options available from Best Teams!\n')
 
         return(options)
 
     def _search_player_nodes(self, name, nodes, playerList, resultList):
         '''
-        Even more complicated...
-        TODO: Make dynamic for breath and depth - currently just depth
+        Run through each draft choice for each round to find which draft pick
+        would potentially return the maximum points.  The high-water-mark
+        algorithm is used to save the best draft selection(s).
+
+        Key-to-Success:
+        Being able to project which players will be dropped between turns.
+        Conviently it turns out that pre-ranks give a very good estimation.
+
+        TODO:
+        Make dynamic for breath and depth - currently just depth
         '''
 
         try:
             pos = nodes[-1].pop()
-        except Exception as ex:
-            # FIX:  This is just so wrong...
+        except Exception:
             raise ValueError('No position to pop from nodes!\n')
 
         # Check for empty nodes after pop
@@ -214,7 +239,8 @@ class Simulator(object):
         try:
             # TODO: Search Random or Deter
             select = random.choice(options.index)
-        except Exception as ex:
+        except Exception:
+            print players_av
             raise ValueError('No options available to make a selection from\n')
 
         # Add player to team
@@ -323,29 +349,28 @@ class DraftResults:
     data frame as oppose to list/dict of objects.
     '''
 
-    def __init__(self, num_of_players):
+    def __init__(self, result_index):
         '''
         Create an object that has access to draft results.  Use to get results
         by team. Or final results, i.e., who won.
         '''
 
-        self._set_constants()
-        self.setup(num_of_players)
+        self._set_child_constants()
+        self.setup(result_index)
 
-    def _set_constants(self):
+    def _set_child_constants(self):
         '''
         Set any constants that should not be changed again here
         '''
+        self.SUMMARY_COL = ['pts', 'rnk']
+        self.RESULT_COL = ['pick', 'rank', 'rnd', 'team', 'name', 'pos', 'pts']
 
-        self._COLUMN_NAMES = ['rank', 'rnd', 'team', 'name', 'pos', 'pts']
-
-    def setup(self, num_of_players):
+    def setup(self, result_index):
         '''
         Not recommended but you can reset Draft Results conditions here
         '''
 
-        self.df = pd.DataFrame(index=np.arange(num_of_players),
-                               columns=self._COLUMN_NAMES)
+        self.df = pd.DataFrame(index=result_index, columns=self.RESULT_COL)
 
     def _update(self, team_name, player):
         '''
@@ -354,9 +379,10 @@ class DraftResults:
         '''
 
         rnd = self.df.team[self.df.team == team_name].count() + 1
-        pick_num = self.df.team.count()
+        pick_num = self.df.team.count() + 1
 
-        self.df.ix[pick_num] = [
+        self.df.ix[player.name] = [
+                                     pick_num,
                                      player['preRank'], rnd, team_name,
                                      player['name'], player['pos'],
                                      player['pts'],
@@ -399,6 +425,12 @@ class DraftResults:
         '''
         Analyze draft results once complete
         '''
+        self.summary = pd.DataFrame(index=self.df.team.unique(),
+                                    columns=self.SUMMARY_COL)
 
-        self.summary = self.df.groupby('team').pts.sum()
+        self.summary['pts'] = self.df.groupby('team').pts.sum()
         self.summary.sort(ascending=False)
+        self.summary['rnk'] = self.summary.pts.rank(ascending=False)
+
+        return(self.summary)
+        

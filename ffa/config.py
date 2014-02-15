@@ -7,7 +7,7 @@ Created on Jan 29, 2014
 @author: rpatel
 '''
 import collections          # ordered dictionary for teams
-
+import copy
 
 class State(object):
     '''
@@ -34,7 +34,7 @@ class State(object):
 
     def __init__(self, LeagueSettings={}, ProfileSetup={}):
         '''
-        Pass desired settings when initializing otherwise use internal default.
+        Pass desired database when initializing otherwise use internal default.
         '''
 
         self.league = League(LeagueSettings)
@@ -48,19 +48,19 @@ class Profile:
     2. More to come...
     '''
 
-    def __init__(self, settings={}):
+    def __init__(self, database={}):
         '''
-        Set up class defaults and base settings
-        - USE SETUP method to update settings
-        - OR modify individual settings (this maybe dangerous)
+        Set up class defaults and base database
+        - USE SETUP method to update database
+        - OR modify individual database (this maybe dangerous)
         '''
 
         self._set_player_default()
-        self.setup(settings)
+        self.setup(database)
 
     def _set_player_default(self):
         '''
-        Set Default settings in case no settings are provided
+        Set Default database in case no database are provided
         '''
 
         # Project Players
@@ -84,7 +84,7 @@ class Profile:
 
         # Custom Players
         custom = {
-                #  pos   os    m1  m2  type
+                #  pos   os    m1    m2  type
                   'QB': [250, +4.5, .85, 'exp'],
                   'RB': [300, +5.2, .80, 'exp'],
                   'WR': [175, +5.0, .20, 'exp'],
@@ -96,17 +96,17 @@ class Profile:
         self.PLAYERS_DATABASE_DEFAULT = database
         self.PLAYERS_CUSTOM_DEFAULT = custom
 
-    def setup(self, settings):
+    def setup(self, database):
         '''
-        Pass settings to update class here otherwise default are used
+        Pass database to update class here otherwise default are used
         '''
 
         # setup players
         # TODO: Need to throw an exception if struct are not set up correctly
-        if not 'player_custom' in settings:
+        if not 'player_custom' in database:
             self.player_custom = self.PLAYERS_CUSTOM_DEFAULT
 
-        if not 'player_database' in settings:
+        if not 'player_database' in database:
             self.player_database = self.PLAYERS_DATABASE_DEFAULT
 
 
@@ -117,17 +117,17 @@ class League:
     parameters directly [need to change this]
     '''
 
-    def __init__(self, settings={}):
+    def __init__(self, database={}):
         '''
         General object setup.
         '''
 
         self._set_default()
-        self.setup(settings)
+        self.setup(database)
 
     def _set_default(self):
         '''
-        Load default settings in case none are provided
+        Load default database in case none are provided
         '''
 
         self.DEFAULT_SETTINGS = {}
@@ -173,21 +173,21 @@ class League:
                             'rank': 2,
                             }
 
-    def setup(self, settings):
+    def setup(self, database):
         '''
         Defines some constant parameters based off of parameters for league.
         '''
 
-        # TODO: FORCE method to update league parameters once initial settings
+        # TODO: FORCE method to update league parameters once initial database
         #       are modified
 
-        if not settings:
-            settings = self.DEFAULT_SETTINGS
+        if not database:
+            database = copy.deepcopy(self.DEFAULT_SETTINGS)
 
         # TODO: Below should all be caught by an exception...
-        self.roster = settings['roster']
-        self.pts_per_stat = settings['stat_pts']
-        self.team_info = settings['profile']
+        self.roster = database['roster']
+        self.pts_per_stat = database['stat_pts']
+        self.team_info = database['profile']
 
         # League Dependent Variables
         self.num_of_teams = len(self.team_info)
@@ -196,3 +196,10 @@ class League:
         self.positions = self.roster.keys()
         #self.team_names = self.team_info.keys()
 
+    def copy_team_info(self):
+        '''
+        Return a deep copy of teams info.  Could just do this inside each
+        module but this feels cleaner if this function is used frequently.
+        '''
+
+        return(copy.deepcopy(self.team_info))

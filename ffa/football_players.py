@@ -219,7 +219,7 @@ class Database(Player):
                          'pts',
                          ]
 
-    def _getPlayerStats(self):
+    def _get_stats(self):
         '''
         Return player stats for (1) projection class or (2) draft pts
         - Careful about post processing here - impacts pts + draft classes
@@ -263,6 +263,38 @@ class Database(Player):
 
         return(players)
 
+    def _set_index(self, stats):
+        '''
+        Create a unique ID from player name.
+        *Caution: Need to add an exception for infinite while loop...
+        '''
+
+        FIRST_NAME = 1
+        LAST_NAME = 6
+        nick_name = []
+
+        for idx_old in stats.index:
+
+            ext = 0
+            name = stats.name[idx_old].split()
+            abbr = name[0][:FIRST_NAME] + name[-1][:LAST_NAME]
+
+            check = abbr in nick_name
+            while check:
+                ext += 1
+                abbr += str(ext)
+                check = abbr in nick_name
+
+                # Raise if we can't create proper player IDs (should not occur)
+                if ext > 10:
+                    raise ValueError('Stuck inside infinite loop...')
+
+            nick_name.append(abbr)
+
+        stats.index = nick_name
+
+        return(stats)
+
     def _clean_stats(self, stats_raw):
         '''
         Convert and clean raw database (.csv) file to readable stats file.
@@ -304,38 +336,6 @@ class Database(Player):
 
         return(stats)
 
-    def _set_index(self, stats):
-        '''
-        Create a unique ID from player name.
-        *Caution: Need to add an exception for infinite while loop...
-        '''
-
-        FIRST_NAME = 1
-        LAST_NAME = 6
-        nick_name = []
-
-        for idx_old in stats.index:
-
-            ext = 0
-            name = stats.name[idx_old].split()
-            abbr = name[0][:FIRST_NAME] + name[-1][:LAST_NAME]
-
-            check = abbr in nick_name
-            while check:
-                ext += 1
-                abbr += str(ext)
-                check = abbr in nick_name
-
-                # Raise if we can't create proper player IDs (should not occur)
-                if ext > 10:
-                    raise ValueError('Stuck inside infinite loop...')
-
-            nick_name.append(abbr)
-
-        stats.index = nick_name
-
-        return(stats)
-
     def _read_from_database(self):
         '''
         Read file from data base and convert to generic data-frame
@@ -355,8 +355,10 @@ class Database(Player):
         '''
         Get players from database
         '''
-        stats = self._getPlayerStats()
-        self.players = self._get_fantasy_points(stats)
+        stats = self._get_stats()
+        stats = self._get_fantasy_points(stats)
+        self.players = self._stats_to_players(stats)
         self._set_for_draft()
-
+        plt.show()
+        
         return(self.players)
