@@ -8,6 +8,8 @@ Created on Jan 29, 2014
 '''
 import collections          # ordered dictionary for teams
 import copy
+import pandas as pd
+
 
 class State(object):
     '''
@@ -134,8 +136,8 @@ class League:
 
         roster = {
                   'QB': 1,
-                  'RB': 2,
-                  'WR': 2,
+                  'RB': 3,
+                  'WR': 3,
                   'TE': 1,
                   }
 
@@ -151,10 +153,11 @@ class League:
                   'fumL':    -2,        # = -2 pts / Fum Lost
                   }
 
+        pro_idx = ['strategy', 'tie', 'rank']
         profile = collections.OrderedDict([
                  # Team   Strat      Tie     Pre-Rank
                    ('A', ['rank'  , 'rand', 'default']),
-                   ('B', ['search'  , 'rand', 'default']),
+                   ('B', ['search', 'rand', 'default']),
                    ('C', ['rank'  , 'rand', 'default']),
                    ('D', ['rank'  , 'rand', 'default']),
                    ('E', ['rank'  , 'rand', 'default']),
@@ -165,13 +168,8 @@ class League:
 
         self.DEFAULT_SETTINGS['roster'] = roster
         self.DEFAULT_SETTINGS['stat_pts'] = points
-        self.DEFAULT_SETTINGS['profile'] = profile
-
-        self.PROFILE_MAP = {
-                            'strategy': 0,
-                            'tie': 1,
-                            'rank': 2,
-                            }
+        self.DEFAULT_SETTINGS['profile'] = pd.DataFrame(profile, index=pro_idx)
+        self.DEFAULT_SETTINGS['profile'].index.name = 'Team Info'
 
     def setup(self, database):
         '''
@@ -190,11 +188,11 @@ class League:
         self.team_info = database['profile']
 
         # League Dependent Variables
-        self.num_of_teams = len(self.team_info)
+        self.num_of_teams = len(self.team_info.columns)
         self.rounds = sum(self.roster.values())
         self.num_of_players = self.num_of_teams * self.rounds
         self.positions = self.roster.keys()
-        #self.team_names = self.team_info.keys()
+        self.team_names = self.team_info.columns.tolist()
 
     def copy_team_info(self):
         '''

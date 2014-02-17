@@ -50,7 +50,7 @@ class Player(object):
         self.players.pts = self.players.pts.apply(np.round)
         self.players = self.players.sort(columns='preRank')
 
-    def plot_position_points(self):
+    def plot_position_points(self, save_path=''):
 
         '''
         Plot pts (keep default order) by positon.  Must be called AFTER players
@@ -64,14 +64,21 @@ class Player(object):
 
         plt.figure()
         for pos in all_pos:
-            plt.plot(self.players.pts[self.players.pos == pos])
+            plt.plot(self.players.pts[self.players.pos == pos], 'o-',
+                     linewidth=2.0)
 
         plt.legend(all_pos)
         plt.grid()
-        plt.xlabel('player rank')
-        plt.ylabel('fantasy pts')
-        plt.title('Fantasy Pts by Position')
-        plt.show()
+        plt.xlabel('Player Rank')
+        plt.ylabel('Fantasy Points')
+        plt.title('Fantasy Points by Position')
+
+        if save_path:
+            fig = plt.gcf()
+            fig.savefig(save_path)
+        else:
+            print 'Close Image to Continue'
+            plt.show()
 
 
 class Artificial(Player):
@@ -182,7 +189,6 @@ class Artificial(Player):
 
         self.players = self._generate()
         self._set_for_draft()
-
         return(self.players)
 
 
@@ -359,6 +365,5 @@ class Database(Player):
         stats = self._get_fantasy_points(stats)
         self.players = self._stats_to_players(stats)
         self._set_for_draft()
-        plt.show()
-        
+
         return(self.players)

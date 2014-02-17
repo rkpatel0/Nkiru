@@ -38,7 +38,7 @@ class Simulator(object):
         Generate Snake Draft Order based on number of teams and roster spots.
         '''
 
-        names = self.league.team_info.keys()
+        names = self.league.team_names
         self._draft_order = []
 
         for i in np.arange(self.league.rounds):
@@ -70,22 +70,22 @@ class Simulator(object):
         profile = self.league.team_info[name]
         playersAv = self._needed_players(name, players, self.results)
 
-        if profile[self.league.PROFILE_MAP['strategy']] == 'max':
+        if profile['strategy'] == 'max':
             options = playersAv.pts == playersAv.pts.max()
-        elif profile[self.league.PROFILE_MAP['strategy']] == 'rank':
+        elif profile['strategy'] == 'rank':
             options = playersAv.preRank == playersAv.preRank.min()
-        elif profile[self.league.PROFILE_MAP['strategy']] == 'user':
+        elif profile['strategy'] == 'user':
             options = self._user_select_player(name, playersAv)
-        elif profile[self.league.PROFILE_MAP['strategy']] == 'search':
+        elif profile['strategy'] == 'search':
             options = self._search_select_player(name, players)
         else:
             raise ValueError('Unknown type of team strategy selected!\n')
 
-        if profile[self.league.PROFILE_MAP['tie']] == 'rand':
+        if profile['tie'] == 'rand':
             select = random.choice(options[options == True].index)
-        elif profile[self.league.PROFILE_MAP['tie']] == 'first':
+        elif profile['tie'] == 'first':
             select = options[options == True].index[0]
-        elif profile[self.league.PROFILE_MAP['tie']] == 'last':
+        elif profile['tie'] == 'last':
             select = options[options == True].index[-1]
         else:
             raise ValueError('Unknown type of team tie-breaker selected!\n')

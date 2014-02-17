@@ -11,11 +11,11 @@ database = ffa.football_players.Database(info)
 custom_players = custom.players_to_draft()
 previous_players = database.players_to_draft()
 
-draft = ffa.draft.Simulator(info.league, previous_players)
-rank_engine = ffa.draft_rank.PreRank(info, previous_players)
+#draft = ffa.draft.Simulator(info.league, custom_players)
+rank_engine = ffa.draft_rank.PreRank(info, custom)
 rank_engine.get_pre_ranks()
 
-tmp = ffa.report.ReportGen(info, previous_players, rank_engine)
+tmp = ffa.report.ReportGen(info, rank_engine,name='TMP')
 tmp.update_pages()
 tmp.close_pages()
 

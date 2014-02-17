@@ -19,6 +19,7 @@ class WriteHtml(object):
     def __init__(self, page_path, page_name):
         'Set all html string formats.'
 
+        # Do not change parent-child order!
         self._set_parent_constants()
         self._set_child_constants()
         self._set_html_format()
@@ -31,28 +32,51 @@ class WriteHtml(object):
         self.TEMPLAGE_PAGE = open(self.PAGE_NAME, 'r')
         self.page_str = self.TEMPLAGE_PAGE.read()
 
+        # Compbine Dictionaries: Don't move or change order: parent + child
+        self.page_text = dict(self.page_parent.items() +
+                              self.page_child.items())
+
     def _set_parent_constants(self):
         'Set all HTML default templates here'
 
         self.DEBUG = False
         self.WEB_TEMPLATE = r'../../References/HtmlTemplates/BigGreen/'
 
+        self.page_parent = {
+                            'TITLE': 'FFA',
+                            'NAME': 'SPORTS ANALYTICS',
+                            'TOC_LIST': 'Fill-in once # of webpages are known',
+                            'SEC1_TITLE': '',
+                            'SEC1_BODY1': '',
+                            'SEC2_TITLE': '',
+                            'SEC2_BODY1': '',
+                            'SLO_1A': 'Those crazy enough to think they can',
+                            'SLO_1B': 'change the world, do',
+                            'HOME': 'summary.html',
+                            'BLOG': 'summary.html',
+                            'SERVICES': 'summary.html',
+                            'CONTACT': 'summary.html',
+                            'RESOURCES': 'summary.html',
+                            'PARTNERS': 'summary.html',
+                            'ABOUT': 'summary.html',
+                            }
+
     def _set_html_format(self):
         'Static HTML Big-Green Fromat'
 
-        self.IMAGE_FMT = "<img width=%s src=%s height=%s/>"
-        self.LINK_FMT = "<a href=%s>%s</a>"
+        self.IMAGE_FMT = "<img width={width} src={url} height={height}/>"
+        self.LINK_FMT = "<a href={url}>{name}</a>"
         self.TBL_STYLESIZE_FMT = 'width:%(width)spx;height:%(height)spx;'
 
-        self.TEXT_FMT = "<p>%s<p>\n"
-        self.LIST_FMT = "<li>%s</li>\n"
         self.HEADER_FMT = "<h%s>%s</h%s>\n"
 
-        self.HTML_FMT = '<{name}>\n%s\n</{name}>\n'
+        self.HTML_FMT = '<{name}>%s</{name}>\n'
         self.TBL_IDX = self.HTML_FMT.format(name='th')
         self.TBL_ITEM = self.HTML_FMT.format(name='td')
         self.TBL_ROW = self.HTML_FMT.format(name='tr')
         self.TBL_NAME = self.HTML_FMT.format(name='table')
+        self.TEXT_FMT = self.HTML_FMT.format(name='p')
+        self.LIST_FMT = self.HTML_FMT.format(name='li')
 
         self.TBL_DEFAULT = {
                             'class': 'tableone',
@@ -182,16 +206,9 @@ class Summary(WriteHtml):
     def _set_child_constants(self):
         'Set static variables here'
 
-        self.page_text = {
-                          "TITLE": "FFA",
-                          'NAME': 'SPORTS ANALYTICS',
-                          'SLO_1A': 'Those crazy enough to think they can',
-                          'SLO_1B': 'change the world, do',
-                          'SEC1_TITLE': 'League Roster',
-                          'SEC1_BODY1': 'SET - TO - LEAGUE - ROSTER',
-                          'SEC2_TITLE': 'League Teams',
-                          'SEC2_BODY1': 'SET - TO - LEAGUE - TEAMS',
-                          }
+        self.page_child = {
+                           }
+
         self.TEMPLATE_NAME = 'summary.html'
 
 
@@ -201,13 +218,8 @@ class Data(WriteHtml):
     def _set_child_constants(self):
         'Set static variables here'
 
-        self.page_text = {
-                          "TITLE": "FFA",
-                          'NAME': 'SPORTS ANALYTICS',
-                          'SLO_1A': 'Those crazy enough to think they can',
-                          'SLO_1B': 'change the world, do',
-                          'SEC1_TITLE': 'League Roster',
-                          'SEC1_BODY1': 'SET - TO - LEAGUE - ROSTER',
+        self.page_child = {
+                           'OPT_IMG1': '',
                           }
 
         self.TEMPLATE_NAME = 'data.html'

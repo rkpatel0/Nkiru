@@ -14,19 +14,20 @@ class PreRank(object):
     classdocs
     '''
 
-    def __init__(self, info, players):
+    def __init__(self, info, player_obj):
         '''
         Constructor
         '''
 
         self.league = info.league
-        self.players = players.sort('pts', ascending=False)
+        self.player_obj = player_obj
+        self.players = player_obj.players.sort('pts', ascending=False)
 
         self._setup()
 
     def _setup(self):
 
-        self.RUN_TO_LEARN = 4
+        self.RUN_TO_LEARN = 6
         self.DEFAULT_STRATEGY = 'search'
         self.PLAYER_COL = ['pos', 'name', 'pts', 'preRank']
         self.DRAFT_COL = ['rnd', 'team']
@@ -69,10 +70,10 @@ class PreRank(object):
         self.summary[self.DRAFT_COL] = self.draft.results.df[self.DRAFT_COL]
         self.summary.set_index('name',  inplace=True)
 
-        # 7. Print Results
         self.summary.sort('rnk' + str(i), inplace=True)
         self.outcome.sort('rnk' + str(i), inplace=True)
 
+        # 7. Print Results
         print self.summary
         print self.outcome
 
@@ -82,7 +83,7 @@ class PreRank(object):
         '''
 
         self.summary = pd.DataFrame(index=summary_index)
-        self.outcome = pd.DataFrame(index=self.league.team_info.keys())
+        self.outcome = pd.DataFrame(index=self.league.team_names)
         self.summary[self.PLAYER_COL] = self.players[self.PLAYER_COL]
         self.summary['start'] = np.arange(self.league.num_of_players) + 1
 
@@ -93,8 +94,7 @@ class PreRank(object):
         '''
 
         STRATEGY_TYPE = 'search'
-        self.team_info_default = self.league.copy_team_info()
+        self.team_info_default = self.league.team_info.copy(deep=True)
 
-        INDEX = self.league.PROFILE_MAP['strategy']
-        for pos in self.league.team_info.keys():
-            self.league.team_info[pos][INDEX] = STRATEGY_TYPE
+        for team in self.league.team_names:
+            self.league.team_info[team]['strategy'] = STRATEGY_TYPE
