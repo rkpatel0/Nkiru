@@ -11,69 +11,75 @@ import copy
 
 class Simulator(object):
     '''
-    Top level cass to simulate drafts given (1) Teams (2) Players (3) League
-    Settings.  Results are saved into their own object, results for post
-    processing at any given time.
+    Inputs Constants: (1) League Settings (2) Players
+    Outputs: (1) Results Object (creates a new copy each time draft is ran
     '''
 
-    def __init__(self, league, players):
+    def __init__(self, oLeague, players):
         '''
-        Pass in (1) League Settings and (2) players for draft.  Player prerank
-        for most drafts will be vital for meaningful results.
-        '''
-        self.setup(league, players)
+        Note:
+        (1) Inputs are classes hence if modified they need not be passed in
+        again, instead update them and run setup() to update internal
 
-    def setup(self, league, players):
+        (2) Inputs are not locally modified - Careful about updating inputs
         '''
-        Use to set up intial Simulator settings.  Call/set this method to
-        after initialization to run a modified draft.
-        '''
-        self.league = league
+
+        self.oLeague = oLeague
         self.players = players
 
+        self.setup()
+
+    def setup(self):
+        'Use to update internal parameters ANYTIME inputs need to be modified'
+
         self._generate_draft_order()
+
+    def live_draft(self):
+        '''
+        Kick-off draft, return draft results object to analyize draft.
+
+        Output: Results Object - store locally since regenerated for each draft
+        '''
+
+        players = self.players.copy()
+        self.oResults = DraftResults(players.index)
+
+        for name in self._draft_order:
+            select = self._select_player(name, players)
+            self.oResults._update(name, players.ix[select])
+            players = players.drop(select)
+
+        return(self.oResults.copy())
 
     def _generate_draft_order(self):
         '''
         Generate Snake Draft Order based on number of teams and roster spots.
         '''
 
-        names = self.league.team_names
+        names = self.oLeague.team_names
         self._draft_order = []
 
-        for i in np.arange(self.league.rounds):
+        for i in np.arange(self.oLeague.rounds):
             self._draft_order.extend(names)
             names.reverse()
-
-    def live_draft(self):
-        '''
-        Kick-off draft, return draft results object to analyize draft.
-        '''
-
-        players = self.players.copy()
-        self.results = DraftResults(players.index)
-
-        for name in self._draft_order:
-            select = self._select_player(name, players)
-            self.results._update(name, players.ix[select])
-            players = players.drop(select)
-
-        self.results.get_results()
-
-        return(self.results)
 
     def _select_player(self, name, players):
         '''
         Return player index's for potential players to draft based on strategy
         '''
 
-        profile = self.league.team_info[name]
-        playersAv = self._needed_players(name, players, self.results)
+        profile = self.oLeague.team_info[name]
+        playersAv = self._needed_players(name, players, self.oResults)
 
         if profile['strategy'] == 'max':
             options = playersAv.pts == playersAv.pts.max()
         elif profile['strategy'] == 'rank':
-            options = playersAv.preRank == playersAv.preRank.min()
+            # TODO: then sory by desired rank (pre/vbd) --> Use a Try!!
+            try:
+                rank_type = profile['rank']
+                options = playersAv[rank_type] == playersAv[rank_type].min()
+            except KeyError:
+                raise KeyError('Cannot find desired pre-rank!')
         elif profile['strategy'] == 'user':
             options = self._user_select_player(name, playersAv)
         elif profile['strategy'] == 'search':
@@ -92,11 +98,11 @@ class Simulator(object):
 
         return(select)
 
-    def _needed_positions(self, name, results):
+    def _needed_positions(self, name, oResults):
         '''
         Return a dictionary of positons that team still needs to draft. Based
         off of league roster and teams previous draft picks
-        
+
         Note:
         Only save positons that NEED TO BE DRAFTED, dictionary should not
         contain ANY positions that need zero more players.  Because search
@@ -105,23 +111,23 @@ class Simulator(object):
         '''
 
         # TODO: Need to factor in flex picks...
-        pos_count = results._count_positions(name, results)
+        pos_count = oResults._count_positions(name, oResults)
 
         # Keep cannot store any zer-valued positons
         keep = {}
-        for pos in self.league.positions:
+        for pos in self.oLeague.positions:
             if pos in pos_count:
-                delta = self.league.roster[pos] - pos_count[pos]
+                delta = self.oLeague.roster[pos] - pos_count[pos]
                 if delta > 0:
                     keep[pos] = delta
                 elif delta < 0:
                     raise ValueError('Game Over')
-            elif self.league.roster[pos] != 0:
-                keep[pos] = self.league.roster[pos]
+            elif self.oLeague.roster[pos] != 0:
+                keep[pos] = self.oLeague.roster[pos]
 
         return(keep)
 
-    def _needed_players(self, name, players, results):
+    def _needed_players(self, name, players, oResults):
         '''
         Return players that team can draft based on team draft picks so far
 
@@ -129,9 +135,9 @@ class Simulator(object):
         remove all players left for particular positon.
         '''
 
-        pos_count = self._needed_positions(name, results)
+        pos_count = self._needed_positions(name, oResults)
 
-        for pos in self.league.positions:
+        for pos in self.oLeague.positions:
             if not pos in pos_count:
                 players = players[players.pos != pos]
 
@@ -143,15 +149,15 @@ class Simulator(object):
         '''
         MAX_DISPLAY = 20
 
-        print '\nCurrent Team:\n', self.results._get_team(name)
-        print '\nTotal Roster Spots\n:', self.league.roster
+        print '\nCurrent Team:\n', self.oResults._get_team(name)
+        print '\nTotal Roster Spots\n:', self.oLeague.roster
         print '\nAvailable Players for your to draft:\n', players[:MAX_DISPLAY]
 
         while True:
             try:
                 msg = '\nTeam ' + name + ' Select Player by preRank column:\n'
                 rnkIdx = np.int64(raw_input(msg))
-                options = players.preRank == rnkIdx
+                options = players.pre == rnkIdx
                 if not options.any():
                     print 'Player not available! Enter a valid preRank index!'
                 else:
@@ -166,16 +172,13 @@ class Simulator(object):
         Where do I even start...
         '''
 
-        # TMP:
-        print 'Search Round:', self.results._get_team(name).team.count() + 1
-
         # Make a copy to initialze
         playerList = [players.copy()]
-        resultList = [self.results.copy()]
-        self.best_team = [self.results.copy()]
-        nodes = [self._needed_positions(name, resultList[-1]).keys()]
+        resultList = [self.oResults.copy()]
+        self.best_team = [self.oResults.copy()]
 
         # Initialize search parameters
+        nodes = [self._needed_positions(name, resultList[-1]).keys()]
         self._search_copy_list(name, nodes, playerList, resultList)
 
         # Keep running until all nodes/branches are exhausted
@@ -192,7 +195,7 @@ class Simulator(object):
         '''
 
         player_names = []
-        team = self.results._get_team(name)
+        team = self.oResults._get_team(name)
         ROUND_INDEX = team.name.count() + 1
 
         # Get player name(s) for from the appropriate round
@@ -237,7 +240,7 @@ class Simulator(object):
         options = players_av[players_av.pts == players_av.pts.max()]
 
         try:
-            # TODO: Search Random or Deter
+            # TODO: Search Random or Deterministic
             select = random.choice(options.index)
         except Exception:
             print players_av
@@ -248,23 +251,23 @@ class Simulator(object):
         NEXT_ROUND = resultList[-1]._get_team(name).team.count()
 
         # Check if team is filled or if there are more nodes to search
-        if NEXT_ROUND == self.league.rounds:
+        if NEXT_ROUND == self.oLeague.rounds:
 
             # Sanity Check: # of players drafted match roster size
             if resultList[-1]._get_team(name).team.count() != NEXT_ROUND:
                 raise ValueError('Did not Draft enought players!\n')
 
             # Remove results and players from lists
-            results = resultList.pop()
+            oResults = resultList.pop()
             playerList.pop()
 
             # Check if latest team is best
-            team_pts = results.get_team_pts(name)
+            team_pts = oResults.get_team_pts(name)
             if team_pts > self.best_team[0].get_team_pts(name):
-                self.best_team = [results]
-                print results._get_team(name)
+                self.best_team = [oResults]
+                print oResults._get_team(name)
             elif team_pts == self.best_team[0].get_team_pts(name):
-                self.best_team.append(results)
+                self.best_team.append(oResults)
 
         else:
             # Only update playerList if branch not complete
@@ -282,11 +285,11 @@ class Simulator(object):
 
         # Pop items from list and re-add (yes in-efficient) but clean...
         players = playerList.pop()
-        results = resultList.pop()
+        oResults = resultList.pop()
 
         for pos in nodes[-1]:
             playerList.append(players.copy())
-            resultList.append(results.copy())
+            resultList.append(oResults.copy())
 
     def _search_drop_projections(self, NEXT_ROUND, name, keep, players):
         '''
@@ -307,7 +310,7 @@ class Simulator(object):
         if NEXT_ROUND % 2 == 0:  # Even
             players_to_drop = 2 * FIRST_WAIT
         else:
-            players_to_drop = 2 * (self.league.num_of_teams - FIRST_WAIT - 1)
+            players_to_drop = 2 * (self.oLeague.num_of_teams - FIRST_WAIT - 1)
 
         playersLeft = players[players_to_drop:]
 
@@ -382,11 +385,9 @@ class DraftResults:
         pick_num = self.df.team.count() + 1
 
         self.df.ix[player.name] = [
-                                     pick_num,
-                                     player['preRank'], rnd, team_name,
-                                     player['name'], player['pos'],
-                                     player['pts'],
-                                     ]
+                                   pick_num, player['pre'], rnd, team_name,
+                                   player['name'], player['pos'], player['pts']
+                                  ]
 
     def _get_team(self, name):
         '''
@@ -421,16 +422,17 @@ class DraftResults:
         pts = self.df.pts[self.df.team == name].sum()
         return(pts)
 
-    def get_results(self):
+    def summarize(self):
         '''
         Analyze draft results once complete
         '''
-        self.summary = pd.DataFrame(index=self.df.team.unique(),
-                                    columns=self.SUMMARY_COL)
+        self.summary = pd.DataFrame(
+                                    index=self.df.team.unique(),
+                                    columns=self.SUMMARY_COL
+                                   )
 
         self.summary['pts'] = self.df.groupby('team').pts.sum()
         self.summary.sort(ascending=False)
         self.summary['rnk'] = self.summary.pts.rank(ascending=False)
 
         return(self.summary)
-        

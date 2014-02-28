@@ -20,7 +20,7 @@ class State(object):
     classes use this to grab/set/creat/modify their own parameters.
 
     Example:
-    Need player stats from database of players between a range of years.
+    Need player stats from oDatabase of players between a range of years.
     (1) Create a method (in Projections Class) that will...
     (1) Set the profile struct in State.profile to point to the desired year
     (2) Grab the player stats using Player Class
@@ -34,13 +34,13 @@ class State(object):
     this method may no longer suffice.
     '''
 
-    def __init__(self, LeagueSettings={}, ProfileSetup={}):
+    def __init__(self, league={}, profile={}):
         '''
-        Pass desired database when initializing otherwise use internal default.
+        Pass desired oDatabase when initializing otherwise use internal default.
         '''
 
-        self.league = League(LeagueSettings)
-        self.profile = Profile(ProfileSetup)
+        self.oLeague = League(league)
+        self.oProfile = Profile(profile)
 
 
 class Profile:
@@ -50,66 +50,66 @@ class Profile:
     2. More to come...
     '''
 
-    def __init__(self, database={}):
+    def __init__(self, oDatabase={}, oCustom={}):
         '''
-        Set up class defaults and base database
-        - USE SETUP method to update database
-        - OR modify individual database (this maybe dangerous)
+        Set up class defaults and base oDatabase
+        - USE SETUP method to update oDatabase
+        - OR modify individual oDatabase (this maybe dangerous)
         '''
 
         self._set_player_default()
-        self.setup(database)
+        self.setup(oDatabase, oCustom)
 
     def _set_player_default(self):
-        '''
-        Set Default database in case no database are provided
-        '''
-
-        # Project Players
+        'Set Default oDatabase in case no oDatabase are provided'
 
         # Previous Players
-        default_header = [
-                          'preRank', 'name', 'team', 'age', 'GP', 'GS',
-                          'passCmp', 'passAtt', 'passYds', 'passTDs', 'int',
-                          'rushAtt', 'rushYds', 'rushAvg', 'rushTDs', 'recCmp',
-                           'recYds', 'recAvg', 'recTDs', 'pos', 'VBD',
-                          ]
-
-        database = {
-                    'year': '2012',
+        oDatabase = {
+                    'year': '2013',
                     'path': r'../../Database/Football/PlayerStatsByYearPFB',
                     'file': ['FantasyStats', '.csv'],
-                    'header': default_header,
-                    'remove': ['FantPt', 'PosRank', 'OvRank'],
-                    'add': ['FumL'],
+                    'remove': [],
                     }
 
         # Custom Players
-        custom = {
-                #  pos   os    m1    m2  type
-                  'QB': [250, +4.5, .85, 'exp'],
-                  'RB': [300, +5.2, .80, 'exp'],
-                  'WR': [175, +5.0, .20, 'exp'],
-                  'TE': [125, +4.5, .99, 'exp'],
-                  'DE': [300, -6.0, .00, 'poly'],
-                  'K':  [200, -6.0, .00, 'poly'],
-                  }
+        customLin = {
+                    #  pos   os    m1    m2  type
+                      'QB': [450, -10,  .00, 'poly'],
+                      'RB': [450, -8,  .00, 'poly'],
+                      'WR': [275, -5,  .00, 'poly'],
+                      'TE': [225, -6,  .00, 'poly'],
+                      'DE': [300, -6.0, .00, 'poly'],
+                      'K':  [200, -6.0, .00, 'poly'],
+                      }
 
-        self.PLAYERS_DATABASE_DEFAULT = database
-        self.PLAYERS_CUSTOM_DEFAULT = custom
+        customExp = {
+                    #  pos   os    m1    m2  type
+                      'QB': [250, +4.5, .85, 'exp'],
+                      'RB': [300, +5.2, .80, 'exp'],
+                      'WR': [175, +5.0, .20, 'exp'],
+                      'TE': [125, +4.5, .99, 'exp'],
+                      'DE': [300, -6.0, .00, 'poly'],
+                      'K':  [200, -6.0, .00, 'poly'],
+                      }
 
-    def setup(self, database):
+        self.PLAYERS_DATABASE_DEFAULT = oDatabase
+        self.PLAYERS_CUSTOM_DEFAULT = customExp
+
+    def setup(self, oDatabase, oCustom):
         '''
-        Pass database to update class here otherwise default are used
+        Pass oDatabase to update class here otherwise default are used
         '''
 
-        # setup players
-        # TODO: Need to throw an exception if struct are not set up correctly
-        if not 'player_custom' in database:
-            self.player_custom = self.PLAYERS_CUSTOM_DEFAULT
+        self.player_database = oDatabase
+        self.player_custom = oCustom
 
-        if not 'player_database' in database:
-            self.player_database = self.PLAYERS_DATABASE_DEFAULT
+        for key in self.PLAYERS_DATABASE_DEFAULT.keys():
+            if key not in oDatabase:
+                self.player_database[key] = self.PLAYERS_DATABASE_DEFAULT[key]
+
+        for key in self.PLAYERS_CUSTOM_DEFAULT.keys():
+            if key not in oDatabase:
+                self.player_custom[key] = self.PLAYERS_CUSTOM_DEFAULT[key]
 
 
 class League:
@@ -119,17 +119,17 @@ class League:
     parameters directly [need to change this]
     '''
 
-    def __init__(self, database={}):
+    def __init__(self, oDatabase={}):
         '''
         General object setup.
         '''
 
         self._set_default()
-        self.setup(database)
+        self.setup(oDatabase)
 
     def _set_default(self):
         '''
-        Load default database in case none are provided
+        Load default oDatabase in case none are provided
         '''
 
         self.DEFAULT_SETTINGS = {}
@@ -141,6 +141,7 @@ class League:
                   'TE': 1,
                   }
 
+        # RKP: Should we move this to profile?
         points = {
                   'passYds': 0.025,     # =  1 pts / 40 yards
                   'passTDs': 4,         # =  4 pts /  1 TD
@@ -153,39 +154,42 @@ class League:
                   'fumL':    -2,        # = -2 pts / Fum Lost
                   }
 
+        # This becomes a dataframe
         pro_idx = ['strategy', 'tie', 'rank']
         profile = collections.OrderedDict([
-                 # Team   Strat      Tie     Pre-Rank
-                   ('A', ['rank'  , 'rand', 'default']),
-                   ('B', ['search', 'rand', 'default']),
-                   ('C', ['rank'  , 'rand', 'default']),
-                   ('D', ['rank'  , 'rand', 'default']),
-                   ('E', ['rank'  , 'rand', 'default']),
-                   ('Z', ['rank'  , 'rand', 'default']),
-                   ('G', ['rank'  , 'rand', 'default']),
-                   ('H', ['rank'  , 'rand', 'default']),
+                   # Team   Strat      Tie     Pre-Rank
+                   ('A0', ['rank'  , 'rand', 'default']),
+                   ('B1', ['search', 'rand', 'default']),
+                   ('C2', ['rank'  , 'rand', 'default']),
+                   ('D3', ['rank'  , 'rand', 'default']),
+                   ('E4', ['rank'  , 'rand', 'default']),
+                   ('F5', ['rank'  , 'rand', 'default']),
+                   ('G6', ['rank'  , 'rand', 'default']),
+                   ('H7', ['rank'  , 'rand', 'default']),
+                   ('I8', ['rank'  , 'rand', 'default']),
+                   ('J9', ['rank'  , 'rand', 'default']),
+                   #('K10', ['rank'  , 'rand', 'default']),
+                   #('L11', ['rank'  , 'rand', 'default']),
                    ])
 
         self.DEFAULT_SETTINGS['roster'] = roster
         self.DEFAULT_SETTINGS['stat_pts'] = points
         self.DEFAULT_SETTINGS['profile'] = pd.DataFrame(profile, index=pro_idx)
-        self.DEFAULT_SETTINGS['profile'].index.name = 'Team Info'
+        self.DEFAULT_SETTINGS['profile'].index.name = 'Info'
 
-    def setup(self, database):
+    def setup(self, oDatabase={}):
         '''
         Defines some constant parameters based off of parameters for league.
         '''
 
-        # TODO: FORCE method to update league parameters once initial database
-        #       are modified
-
-        if not database:
-            database = copy.deepcopy(self.DEFAULT_SETTINGS)
+        for key in self.DEFAULT_SETTINGS.keys():
+            if key not in oDatabase:
+                oDatabase[key] = self.DEFAULT_SETTINGS[key]
 
         # TODO: Below should all be caught by an exception...
-        self.roster = database['roster']
-        self.pts_per_stat = database['stat_pts']
-        self.team_info = database['profile']
+        self.roster = oDatabase['roster']
+        self.pts_per_stat = oDatabase['stat_pts']
+        self.team_info = oDatabase['profile']
 
         # League Dependent Variables
         self.num_of_teams = len(self.team_info.columns)

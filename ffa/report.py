@@ -5,9 +5,10 @@ Created on Feb 11, 2014
 '''
 
 import os
-import pandas as pd
+import numpy as np
 import shutil
 import ffa.big_green_webpage as webpage
+import matplotlib.pyplot as plt
 
 
 class ReportGen(object):
@@ -25,46 +26,27 @@ class ReportGen(object):
     having to rerun all the phase-one abstration layer code.
     '''
 
-    def __init__(self, info, results, name='', directory=''):
+    def __init__(self, pages, name='', directory=''):
         '''
         Folder will be created once this class is generated.  Create a new
         class each time another project needs to be created.
         '''
 
-        # RKP: Sister Projects ?
-        # That need two top level folders but share low level files
-        self.league = info.league
-        self.profile = info.profile
-        self.players = results.player_obj
-        self.results = results
-
+        self.pages = pages
+        self.dummy_page = webpage.Data()
         self._set_constants()
-        self.set_webpage(name, directory)
+        self._set_webpage(name, directory)
 
     def _set_constants(self):
         '''
         Set intial/default variables.
         '''
 
-        self.page_names = {
-                           'Summary': 'summary.html',
-                           'Players': 'players.html',
-                           'Results': 'results.html',
-                           }
-
-        self.WEB_TEMPLATE = r'../../References/HtmlTemplates/BigGreen/'
-        self.DEFAULT_DIRECTORY = r'../../Analysis/'
         self.DEFAULT_PROJECT_NAME = 'DEFAULT'
+        self.DEFAULT_DIRECTORY = r'../../Analysis/'
+        self.PLOT_PATH = 'plots/'
 
-    def save_league_summary(self, league):
-        '''
-        Create TOC and League Summary Page.
-        '''
-
-        # TODO: (1) Author (2) Date (3) TOC
-        pass
-
-    def set_webpage(self, name, directory):
+    def _set_webpage(self, name, directory):
         '''
         Create project directories and open webpages.
         '''
@@ -72,90 +54,126 @@ class ReportGen(object):
         # Check if folder names exist
         if not name:
             name = self.DEFAULT_PROJECT_NAME
-
         if not directory:
             directory = self.DEFAULT_DIRECTORY
+        self.path = directory + name + '/'
 
-        if not name[-1] == '/':
-            name = name + '/'
-        self.path = directory + name
-        self.plot_path = self.path + 'plots/'
-
-        # Create Report Directory
+        # Check and Create HTML Folder
         if os.path.exists(self.path):
             print 'WARNING OVER-WRITING FILES IN DICTORY:\n', self.path
             shutil.rmtree(self.path)
         else:
             print 'Creating new directory:\n', self.path
+        shutil.copytree(self.dummy_page.WEB_TEMPLATE + 'standard', self.path)
 
-        shutil.copytree(self.WEB_TEMPLATE + 'standard', self.path)
-
-        self.SUM_WEB = webpage.Summary(self.path, self.page_names['Summary'])
-        self.PLY_WEB = webpage.Data(self.path, self.page_names['Players'])
-        self.RES_WEB = webpage.Data(self.path, self.page_names['Results'])
-
-    def update_summary_page(self):
+    def overview_page(self, info):
         'Copy webpage templete to new location'
 
-        self.SUM_WEB.page_text['SEC1_TITLE'] = 'League Roster'
-        self.SUM_WEB.page_text['SEC1_BODY1'] = \
-        self.SUM_WEB.dict_to_table(self.league.roster)
-        self.SUM_WEB.page_text['SEC2_TITLE'] = 'Team Summary',
-        self.SUM_WEB.page_text['SEC2_BODY1'] = \
-        self.SUM_WEB.dataframe_to_table(pd.DataFrame(self.league.team_info))
-        self.SUM_WEB.page_text['TOC_LIST'] = \
-        self.link_list_of_pages()
+        data = info['pg_data']
+        oPage = webpage.Summary(self.path, info['pg_name'])
 
-    def link_list_of_pages(self):
-        'Convert dictionary of pages to a list of links'
+        oPage.remap['SBAR1_BODY'] = self.toc_html
+        oPage.remap['SEC1_TITLE'] = data['SEC1_TITLE']
+        oPage.remap['SEC1_BODY1'] = data['SEC1_BODY1']
+        oPage.remap['SEC2_TITLE'] = data['SEC2_TITLE']
+        oPage.remap['SEC2_BODY1'] = oPage.df_to_table(data['roster'])
+        oPage.remap['SEC3_TITLE'] = data['SEC3_TITLE']
+        oPage.remap['SEC3_BODY1'] = oPage.df_to_table(data['team_df'])
+        oPage.create_page()
 
-        list_html = ''
-        for name in self.page_names:
-            link = self.SUM_WEB.LINK_FMT.format(url=self.page_names[name],
-                                                name=name)
-            list_html += self.SUM_WEB.LIST_FMT % link
-
-        return(self.SUM_WEB.HTML_FMT.format(name='ul') % list_html)
-
-    def update_players_page(self):
+    def player_page(self, info):
         'Copy webpage templete to new location'
 
-        self.PLY_WEB.page_text['SEC1_TITLE'] = 'Player List'
-        self.PLY_WEB.page_text['SEC1_BODY1'] = \
-        self.PLY_WEB.dataframe_to_table(self.players.players.set_index('name'))
-        self.PLY_WEB.page_text['TOC_LIST'] = \
-        self.SUM_WEB.page_text['TOC_LIST']
+        data = info['pg_data']
+        oPlayers = data['obj']
 
-        # Generate and Save Image + Add URL
-        url = self.plot_path + 'players_by_pos.png'
-        self.players.plot_position_points(url)
-        self.PLY_WEB.page_text['OPT_IMG1'] = \
-        self.PLY_WEB.IMAGE_FMT.format(width='100%', url=url, height='100%')
+        url_path = self.PLOT_PATH + 'players_by_pos.png'
+        data['fig_by_pos'].savefig(self.path + url_path)
 
-    def update_results_page(self):
+        oPage = webpage.Data(self.path, info['pg_name'])
+        image_html = oPage.IMAGE_FMT.format(w='100%', url=url_path, h='100%')
+        SEC2_BODY1 = oPage.df_to_table(data['ovr_body']) + '<br>' + image_html
+
+        oPage.remap['SBAR1_BODY'] = self.toc_html
+        oPage.remap['SEC1_TITLE'] = oPlayers.bio['header']
+        oPage.remap['SEC1_BODY1'] = oPlayers.bio['msg']
+        oPage.remap['SEC2_TITLE'] = data['ovr_title']
+        oPage.remap['SEC2_BODY1'] = SEC2_BODY1
+        oPage.remap['SEC3_TITLE'] = data['details_title']
+        oPage.remap['SEC3_BODY1'] = oPage.df_to_table(data['details_data'])
+        oPage.create_page()
+
+    def prerank_result_page(self, info):
         'Update Results Page'
 
-        self.RES_WEB.page_text['SEC1_TITLE'] = 'Draft Results'
-        self.RES_WEB.page_text['SEC1_BODY1'] = \
-        self.RES_WEB.dataframe_to_table(self.results.summary)
-        self.RES_WEB.page_text['TOC_LIST'] = \
-        self.SUM_WEB.page_text['TOC_LIST']
+        data = info['pg_data']
+        oPage = webpage.Data(self.path, info['pg_name'])
+
+        oPage.remap['SBAR1_BODY'] = self.toc_html
+        oPage.remap['SEC1_TITLE'] = 'Projected Team Standings after Draft'
+        oPage.remap['SEC1_BODY1'] = oPage.df_to_table(data['outcome'])
+        oPage.remap['SEC2_TITLE'] = 'Draft Results After Each Iteration'
+        oPage.remap['SEC2_BODY1'] = oPage.df_to_table(data['summary'])
+        oPage.create_page()
+
+    def roster_result_page(self, info):
+        'Update Results Page'
+
+        data = info['pg_data']
+        oPage = webpage.Data(self.path, info['pg_name'])
+
+        # TODO: Clean up roster rank image!
+        plt.figure()
+        df_plt = data['summary'].convert_objects().dropna().sort('pre')
+        df_plt['pre'] = np.arange(len(df_plt)) + 1
+        df_plt.plot(x='pre', style='o')
+        plt.plot(df_plt['pre'], df_plt['pre'], 'k--')
+        plt.tight_layout()
+        plt.xlabel('Pre Rank Default')
+        plt.ylabel('Pre Rank by League Settings')
+        plt.title('Pre Rankings: Custom vs. Default')
+
+        f5 = df_plt.drop('pos', axis=1)
+        f5 = f5.set_index('pre')
+
+        for idx in f5.columns:
+            f5[idx] = f5[idx] - np.arange(len(f5)) - 1
+
+        f6 = f5.std()
+        l_std = [idx + ': STD = ' + str(f6[idx].round(1)) for idx in f6.index]
+        plt.legend(l_std, loc='best')
+        fig = plt.gcf()
+        url_path = self.PLOT_PATH + 'Summary_of_Results.png'
+        data['fig_summary'].savefig(self.path + url_path)
+
+        image_html = oPage.IMAGE_FMT.format(w='100%', url=url_path, h='100%')
+
+        data['summary']['pre'] = df_plt['pre']
+        SEC2_BODY1 = image_html + '<br>' + oPage.df_to_table(data['summary'])
+
+        oPage.remap['SBAR1_BODY'] = self.toc_html
+        oPage.remap['SEC1_TITLE'] = data['SEC1_TITLE']
+        oPage.remap['SEC1_BODY1'] = data['SEC1_BODY1']
+        oPage.remap['SEC2_TITLE'] = data['SEC2_TITLE']
+        oPage.remap['SEC2_BODY1'] = SEC2_BODY1
+        oPage.create_page()
 
     def update_pages(self):
         'Update selected pages'
 
-        # Do not change this order!!!
-        self.update_summary_page()
-        self.update_players_page()
-        self.update_results_page()
+        toc_dict = {val: val + '.html' for val in self.pages.ix['pg_name']}
+        self.toc_html = self.dummy_page.dict_to_list_of_links(toc_dict)
 
-    def close_pages(self):
-        '''
-        Close pages and any other on-exit actions.
-        '''
+        for col in self.pages.columns:
+            page = self.pages[col]
 
-        self.SUM_WEB.write_page()
-        self.PLY_WEB.write_page()
-        self.RES_WEB.write_page()
-
-
+            if page['pg_type'] == 'view':
+                self.overview_page(page)
+            elif page['pg_type'] == 'ply':
+                self.player_page(page)
+            elif  page['pg_type'] == 'pre':
+                self.prerank_result_page(page)
+            elif  page['pg_type'] == 'fin':
+                self.roster_result_page(page)
+            else:
+                raise ValueError('No such page type!!')

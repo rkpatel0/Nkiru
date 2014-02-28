@@ -17,38 +17,39 @@ class Player(object):
     '''
     SubClass to Database and Artificial Player Classes.  In general, this class
     should never be directly called.  Let Database and Artificial Player
-    Classes call this class and set any needed properties.
+    inherit this class and set any needed properties.
     '''
-
-    def __init__(self, info):
-        '''
-        Pass object to setup Arificial and Database player generator.  Even if
-        both are not being used both need to be set up.  Using 'info' default
-        database will be passed so one need not directly initialize explicity.
-        '''
-        pass
-
-        #self.custom = Artificial(info.league, info.profile.player_custom)
-        #self.past = Database(info.league, info.profile.player_database)
 
     def _set_player_defaults(self):
         '''
         Set all player (general) default values here.  This must specifically
         be called by sub class!
-
-        RKP: Could we make this be auto-called on initialization?
         '''
 
+        # RKP: Clean Up Header!!
         self.PLAYER_DEFAULT = {}
-        self.PLAYER_DEFAULT['draft'] = ['name', 'pos', 'preRank', 'pts']
+        self.PLAYER_DEFAULT['draft'] = ['name', 'pos', 'pre', 'pts']
+        self.DEFAILT_BIO_MSG = (
+        '<br><br>Observe the positional slope/decay in the <strong>Points vs. '
+        'Rank-by-Positon Plot</strong> below. This is one of the major '
+        'factors in determining prerankings.  Most prerank generators assume '
+        'a linear slope due to compuational or algorithmic limitations.  '
+        'However our latest prerank engines embrace all the non-linearity '
+        'that exists in these real-world applications.')
 
-    def _set_for_draft(self):
+    def set_to_draft(self):
         '''
-        Keeps all sub-player classes synced
+        Generates players based on current state settings.
+        Must recall this function anytime state changes to update player stats
         '''
 
-        self.players.pts = self.players.pts.apply(np.round)
-        self.players = self.players.sort(columns='preRank')
+        # Call child generate function
+        self.df = self._generate()
+
+        # Apply standard configuration
+        self.df.pts = self.df.pts.apply(np.round)
+        self.df = self.df.sort(columns='pre')
+        self._set_bio()
 
     def plot_position_points(self, save_path=''):
 
@@ -58,27 +59,24 @@ class Player(object):
         '''
 
         try:
-            all_pos = self.players.pos.unique()
+            all_pos = self.df.pos.unique()
         except NameError:
             raise NameError('Need to create players before plotting!')
 
         plt.figure()
         for pos in all_pos:
-            plt.plot(self.players.pts[self.players.pos == pos], 'o-',
-                     linewidth=2.0)
+            players = self.df.pts[self.df.pos == pos].copy()
+            players.sort(ascending=False)
+            plt.plot(players, 'o-', linewidth=2.0)
 
         plt.legend(all_pos)
         plt.grid()
         plt.xlabel('Player Rank')
         plt.ylabel('Fantasy Points')
         plt.title('Fantasy Points by Position')
+        plt.tight_layout()
 
-        if save_path:
-            fig = plt.gcf()
-            fig.savefig(save_path)
-        else:
-            print 'Close Image to Continue'
-            plt.show()
+        return(plt.gcf())
 
 
 class Artificial(Player):
@@ -86,17 +84,16 @@ class Artificial(Player):
     Create custom defined players by passing slopes and offet.  Can create
     players with (1) polynomial decay (2) exponential decay.
     '''
-    def __init__(self, info):
+    def __init__(self, oState):
 
-        self.league = info.league
-        self.player_equation = info.profile.player_custom
+        self.oLeague = oState.oLeague
+        self.player_equation = oState.oProfile.player_custom
         self._set_player_defaults()
         self._setup()
 
     def _setup(self):
-        '''
-        Set general class initial conditions.
-        '''
+        'Set general class initial conditions.'
+
         self.SCALE_COEFF_2 = 0.1
 
     def _generate(self):
@@ -105,12 +102,12 @@ class Artificial(Player):
         '''
 
         players = pd.DataFrame(columns=self.PLAYER_DEFAULT['draft'],
-                               index=np.arange(self.league.num_of_players))
+                               index=np.arange(self.oLeague.num_of_players))
 
         idx = 0
-        for pos in self.league.roster.keys():
+        for pos in self.oLeague.roster.keys():
 
-            num_of_pos = self.league.roster[pos] * self.league.num_of_teams
+            num_of_pos = self.oLeague.roster[pos] * self.oLeague.num_of_teams
             pts_by_pos = self._get_points(num_of_pos,
                                           self.player_equation[pos])
 
@@ -140,7 +137,7 @@ class Artificial(Player):
             points = self._get_points_exp(arr_of_pos, coeff[:-1])
 
         else:
-            print 'You entered an invalid custom player equation type!\n'
+            raise ValueError('Invalid custom player equation type!\n')
 
         return(points)
 
@@ -153,18 +150,9 @@ class Artificial(Player):
         Equation:
         pts = exp(-m2 * x + m1) + m0'
         m0' = m0 - exp(m1)
-
-        Note:
-        Player drop-off most fits an exp decay.  This will be the most eligant
-        way to evaluate artificial player performance.
-
-        Careful with Log Fitting:
-        (1) random noise and (2) amplification at high values (3) matlab code
-
         '''
 
         coeff[2] = self.SCALE_COEFF_2 * coeff[2]
-
         pts = np.exp(-coeff[2] * arr + coeff[1]) + coeff[0] - np.exp(coeff[1])
 
         return(pts)
@@ -182,14 +170,24 @@ class Artificial(Player):
 
         return(pts)
 
-    def players_to_draft(self):
-        '''
-        Returns custom-defined players as defined in league and profile objects
-        '''
+    def _set_bio(self):
+        'Dictionary of player-related information for report/webpage'
 
-        self.players = self._generate()
-        self._set_for_draft()
-        return(self.players)
+        self.bio = {}
+
+        df = pd.DataFrame(self.player_equation)
+        info = (
+        'Players for this simulation have been <strong>Artificially</strong> '
+        'derived using the table below.  Each position fits either a <strong>'
+        'Polynomial</strong> or an <strong>Exponential</strong> (decay) curve.'
+        '  These curves model player role-off relative to each position. '
+        'This helps to illustrate the impact of different slopes and decay '
+        'curves and how they may impact the pre-rankings.' +
+        self.DEFAILT_BIO_MSG)
+
+        self.bio['data'] = df
+        self.bio['header'] = 'Player Background'
+        self.bio['msg'] = info
 
 
 class Database(Player):
@@ -197,17 +195,17 @@ class Database(Player):
     Get player stats (or points) as defined database.  Either return players
     for fantasy specific purposes or projections.
 
-    Use info.league and info.database to define desired database player stats.
+    Use info.oLeague and info.database to define desired database player stats.
     '''
 
-    def __init__(self, info):
+    def __init__(self, oState):
         '''
         Always pass database on initializtion, then use those objects to define
         desired player stats.
         '''
 
-        self.league = info.league
-        self.database = info.profile.player_database
+        self.oLeague = oState.oLeague
+        self.oDatabase = oState.oProfile.player_database
         self._set_player_defaults()
         self._setup()
 
@@ -216,14 +214,25 @@ class Database(Player):
         Set general class initial conditions.
         '''
 
-        # RKP: Is this really the final structure for stat-pts??
-        self.stat_col = [
+        # Must sync/map STAT_COL and RAW_COL_MAP as only the columns that are
+        # the same between the two are kept in the final stats df.
+        self.STAT_COL = [
                          'preRank', 'name', 'team', 'age', 'GP', 'GS',
                          'passCmp', 'passAtt', 'passYds', 'passTDs', 'int',
                          'rushAtt', 'rushYds', 'rushAvg', 'rushTDs', 'recCmp',
                          'recYds', 'recAvg', 'recTDs', 'fumL', 'pos', 'VBD',
                          'pts',
                          ]
+
+        # Order Matters! Each item below needs to line up with the raw stats
+        # database.  Do not skip any items!
+        self.RAW_COL_MAP = [
+                            'pre', 'name', 'team', 'age', 'GP', 'GS',
+                            'passCmp', 'passAtt', 'passYds', 'passTDs', 'int',
+                            'rushAtt', 'rushYds', 'rushAvg', 'rushTDs',
+                            'recCmp', 'recYds', 'recAvg', 'recTDs', 'pos',
+                            'FantPt', 'VBD', 'PosRank', 'OvRank',
+                            ]
 
     def _get_stats(self):
         '''
@@ -245,8 +254,8 @@ class Database(Player):
                 then, under _draft_clean_up we only keep columns for draft
         '''
 
-        for category in self.league.pts_per_stat.keys():
-            stats.pts += (self.league.pts_per_stat[category] * stats[category])
+        for category in self.oLeague.pts_per_stat.keys():
+            stats.pts += (self.oLeague.pts_per_stat[category] * stats[category])
 
         stats.sort(columns='pts', ascending=False, inplace=True)
 
@@ -257,8 +266,8 @@ class Database(Player):
         players = pd.DataFrame(columns=self.PLAYER_DEFAULT['draft'])
 
         # Remove excess players at each position + keep only draft categories
-        for pos in self.league.positions:
-            num = self.league.roster[pos] * self.league.num_of_teams
+        for pos in self.oLeague.positions:
+            num = self.oLeague.roster[pos] * self.oLeague.num_of_teams
             keep = stats[self.PLAYER_DEFAULT['draft']][stats.pos == pos][:num]
 
             if len(keep) < num:
@@ -310,18 +319,18 @@ class Database(Player):
         '''
 
         # 1. Remove unnecessary database/raw columns
-        stats_raw = stats_raw.drop(self.database['remove'], axis=1)
+        stats_raw = stats_raw.drop(self.oDatabase['remove'], axis=1)
 
         # 2. Map database/raw header to internal names
         try:
-            stats_raw.columns = self.database['header']
+            stats_raw.columns = self.RAW_COL_MAP
         except Exception as ex:
             msg = 'Cannot map internal column format to raw stats data frame\n'
             template = ('Exception of type: {0} occured.\nArguments: {1!r}\n')
             raise ValueError(msg + template.format(type(ex).__name__, ex.args))
 
         # 3. Create stats dataframe
-        stats = pd.DataFrame(columns=self.stat_col, index=stats_raw.index)
+        stats = pd.DataFrame(columns=self.STAT_COL, index=stats_raw.index)
 
         # 4. Add data from raw stats (there is no .add_column function)
         try:
@@ -347,23 +356,40 @@ class Database(Player):
         Read file from data base and convert to generic data-frame
         '''
 
-        file_name = self.database['file'][0] + self.database['year'] + \
-                    self.database['file'][1]
+        file_name = self.oDatabase['file'][0] + self.oDatabase['year'] + \
+                    self.oDatabase['file'][1]
 
-        # RKP: Should we add a try here?
-        file_path = os.path.join(self.database['path'], file_name)
+        self.file_path = os.path.join(self.oDatabase['path'], file_name)
 
-        stats = pd.read_csv(file_path)
+        try:
+            stats = pd.read_csv(self.file_path)
+        except IOError:
+            raise IOError('Cannot open file:\n' + self.file_path)
 
         return(stats)
 
-    def players_to_draft(self):
+    def _generate(self):
         '''
         Get players from database
         '''
         stats = self._get_stats()
         stats = self._get_fantasy_points(stats)
-        self.players = self._stats_to_players(stats)
-        self._set_for_draft()
+        players = self._stats_to_players(stats)
 
-        return(self.players)
+        return(players)
+
+    def _set_bio(self):
+        'Dictionary of player-related information for report/webpage'
+
+        self.bio = {}
+
+        df = pd.DataFrame(self.oLeague.pts_per_stat, index=['points'])
+        info = ('Players for this simulation are from the <strong>{year}'
+                '</strong> season and from the <strong>{path}</strong> '
+                'database. Below are the Points per Stat used to derive '
+                'players point totals.' + self.DEFAILT_BIO_MSG).format
+
+        self.bio['data'] = df
+        self.bio['header'] = 'Player Background'
+        self.bio['msg'] = info(year=self.oDatabase['year'],
+                               path=self.oDatabase['file'][0])

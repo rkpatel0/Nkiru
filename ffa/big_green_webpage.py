@@ -6,7 +6,6 @@ Created on Feb 13, 2014
 @author: rpatel
 '''
 
-import pandas as pd
 import shutil
 
 
@@ -16,7 +15,7 @@ class WriteHtml(object):
     to file as this class does not store anything.
     '''
 
-    def __init__(self, page_path, page_name):
+    def __init__(self, page_path='', page_name=''):
         'Set all html string formats.'
 
         # Do not change parent-child order!
@@ -25,51 +24,65 @@ class WriteHtml(object):
         self._set_html_format()
 
         self.page_path = page_path
-        self.PAGE_NAME = page_path + page_name
+        self.PAGE_NAME = page_path + page_name + '.html'
         self.TEMPLATE_PATH = self.WEB_TEMPLATE + self.TEMPLATE_NAME
 
-        shutil.copy(self.TEMPLATE_PATH, self.PAGE_NAME)
-        self.TEMPLAGE_PAGE = open(self.PAGE_NAME, 'r')
-        self.page_str = self.TEMPLAGE_PAGE.read()
-
         # Compbine Dictionaries: Don't move or change order: parent + child
-        self.page_text = dict(self.page_parent.items() +
-                              self.page_child.items())
+        self.remap = dict(self.page_parent.items() + self.page_child.items())
+
+        # Check for dummy page
+        if not page_name:
+            pass
+        else:
+            shutil.copy(self.TEMPLATE_PATH, self.PAGE_NAME)
+            self.TEMPLAGE_PAGE = open(self.PAGE_NAME, 'r')
+            self.page_str = self.TEMPLAGE_PAGE.read()
 
     def _set_parent_constants(self):
         'Set all HTML default templates here'
 
         self.DEBUG = False
+        self.MAX_TEXT_WIDTH = 600
+        self.TBL_ROW_HEIGHT = 28
+        self.TBL_ROW_WIDTH = 60
+
         self.WEB_TEMPLATE = r'../../References/HtmlTemplates/BigGreen/'
+        SLOGAN = ('Those <strong>crazy</strong> enough to think they can<br>'
+                 '<strong>change</strong> the world, <strong>do</strong>')
 
         self.page_parent = {
                             'TITLE': 'FFA',
-                            'NAME': 'SPORTS ANALYTICS',
-                            'TOC_LIST': 'Fill-in once # of webpages are known',
+                            'NAME': 'Fantasy Sports Analytics',
+                            'SBAR1_BODY': 'Fill-in once # of webpages are known',
                             'SEC1_TITLE': '',
                             'SEC1_BODY1': '',
                             'SEC2_TITLE': '',
                             'SEC2_BODY1': '',
-                            'SLO_1A': 'Those crazy enough to think they can',
-                            'SLO_1B': 'change the world, do',
-                            'HOME': 'summary.html',
-                            'BLOG': 'summary.html',
-                            'SERVICES': 'summary.html',
-                            'CONTACT': 'summary.html',
-                            'RESOURCES': 'summary.html',
-                            'PARTNERS': 'summary.html',
-                            'ABOUT': 'summary.html',
+                            'SEC3_TITLE': '',
+                            'SEC3_BODY1': '',
+                            'SBAR1_TITLE': 'Main Menu',
+                            'SBAR1_BODY': '',
+                            'SBAR2_TITLE': 'Football 2014',
+                            'SBAR2_BODY': 'How will you do this season?',
+                            'SLOGAN': SLOGAN,
+                            'HOME': 'overview.html',
+                            'BLOG': 'overview.html',
+                            'SERVICES': 'overview.html',
+                            'CONTACT': 'overview.html',
+                            'RESOURCES': 'overview.html',
+                            'PARTNERS': 'overview.html',
+                            'ABOUT': 'overview.html',
                             }
 
     def _set_html_format(self):
         'Static HTML Big-Green Fromat'
 
-        self.IMAGE_FMT = "<img width={width} src={url} height={height}/>"
+        self.IMAGE_FMT = "<img width={w} src={url} height={h}/>"
         self.LINK_FMT = "<a href={url}>{name}</a>"
         self.TBL_STYLESIZE_FMT = 'width:%(width)spx;height:%(height)spx;'
 
+        self.BREAK_FMT = '<br>'
         self.HEADER_FMT = "<h%s>%s</h%s>\n"
-
         self.HTML_FMT = '<{name}>%s</{name}>\n'
         self.TBL_IDX = self.HTML_FMT.format(name='th')
         self.TBL_ITEM = self.HTML_FMT.format(name='td')
@@ -90,38 +103,34 @@ class WriteHtml(object):
         'Convert basic test to html format'
 
         text_html = self.TEXT_FMT % (text)
-        self.write_to_file(text_html)
+        return(text_html)
 
     def link(self, url, name='Click Here'):
         'Convert name to a url link'
 
         link_html = self.LINK_FMT % (url, name)
-        #self.write_to_file(link_html)
         return(link_html)
 
     def header(self, header, level=2):
         'Convert string to basic header'
 
         header_html = self.HEADER_FMT % (level, header, level)
-        self.write_to_file(header_html)
+        return(header_html)
 
     def image(self, path, w='50%', l='50%'):
         'Add image path to html webpage.'
 
         image_html = self.IMAGE_FMT % (w, path, l)
-        #self.write_to_file(image_html)
         return(image_html)
 
-    def list(self, title, items, bullet='ol'):
-        'Convert a list into a html list and write to file.'
+    def to_list(self, items):
+        'Convert a list into a html list'
 
-        self.text(title)
-        self.write_to_file('<' + bullet + '>\n')
+        str_html = ''
         for words in items:
-            str_html = self.LIST_FMT % (words)
-            self.write_to_file(str_html)
+            str_html += self.LIST_FMT % (words)
 
-        self.write_to_file('</' + bullet + '>\n')
+        return(str_html)
 
     def to_table_html(self, raw_html, info={}):
         'Convert raw_html to standard table html'
@@ -135,17 +144,17 @@ class WriteHtml(object):
         css_html = self.CSS_STYLE.format(cls=info['class'],
                                          style=style_html,
                                          data=tbl_html)
+        return(css_html + '<br>')
 
-        if self.DEBUG:
-            print css_html
-
-        return(css_html)
-
-    def dataframe_to_table(self, df, info={}):
+    def df_to_table(self, df, info={}):
         'Convert dataframe to table'
 
-        info['height'] = 25 * (df.index.size + 1)
-        info['width'] = 50 * (df.columns.size + 1)
+        info['height'] = self.TBL_ROW_HEIGHT * (df.index.size + 1)
+        width = self.TBL_ROW_WIDTH * (df.columns.size + 2)
+
+        if width > self.MAX_TEXT_WIDTH:
+            width = self.MAX_TEXT_WIDTH
+        info['width'] = width
 
         df_html = self.list_to_tablerow(df.columns.tolist(), df.index.name)
 
@@ -153,14 +162,6 @@ class WriteHtml(object):
             df_html += self.list_to_tablerow(df.ix[idx].tolist(), idx)
 
         css_html = self.to_table_html(df_html, info)
-
-        return(css_html)
-
-    def dict_to_table(self, my_dict, tbl_class='', tbl_style=''):
-        'Convert a dictionary to a table'
-
-        df = pd.DataFrame([my_dict.values()], columns=my_dict.keys())
-        css_html = self.dataframe_to_table(df)
 
         return(css_html)
 
@@ -172,25 +173,22 @@ class WriteHtml(object):
         for name in my_list:
             html_str += self.TBL_ITEM % name
 
-        if self.DEBUG:
-            print html_str
-
         return(self.TBL_ROW % html_str)
 
-    def write_to_file(self, str_html):
-        '''
-        All HTML formated writing should be done through here.
-        '''
+    def dict_to_list_of_links(self, my_dict):
+        'Convert dictionary of pages to a list of links'
 
-        if self.DEBUG:
-            print str_html
+        list_html = ''
+        for name in my_dict.keys():
+            link = self.LINK_FMT.format(url=my_dict[name], name=name)
+            list_html += self.LIST_FMT % link
 
-        self.PAGE.write(str_html)
+        return(self.HTML_FMT.format(name='ul') % list_html)
 
-    def write_page(self):
-        'Write Variables to webpage'
+    def create_page(self):
+        'Write to webpage'
 
-        self.page_update = self.page_str % self.page_text
+        self.page_update = self.page_str % self.remap
 
         self.PAGE = open(self.PAGE_NAME, 'w')
         self.PAGE.write(self.page_update)
@@ -207,9 +205,9 @@ class Summary(WriteHtml):
         'Set static variables here'
 
         self.page_child = {
-                           }
+                          }
 
-        self.TEMPLATE_NAME = 'summary.html'
+        self.TEMPLATE_NAME = 'overview.html'
 
 
 class Data(WriteHtml):
@@ -219,7 +217,6 @@ class Data(WriteHtml):
         'Set static variables here'
 
         self.page_child = {
-                           'OPT_IMG1': '',
                           }
 
         self.TEMPLATE_NAME = 'data.html'

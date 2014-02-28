@@ -8,9 +8,9 @@ def main():
     clark = SuperMan()
 
     info = ffa.config.State()
-    database = ffa.football_players.Database(info)
-    database_players = database.players_to_draft()
-    database.plot_position_points()
+    oDatabase = ffa.football_players.Database(info)
+    database_players = oDatabase.set_to_draft()
+    oDatabase.plot_position_points()
     
     draft = ffa.draft.Simulator(info.league, database_players)
     draft.live_draft()

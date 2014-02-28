@@ -1,22 +1,22 @@
 import ffa.config
 import ffa.football_players
-import ffa.draft
 import ffa.draft_rank
-import ffa.report
 import cProfile as cp
 
-info = ffa.config.State()
-custom = ffa.football_players.Artificial(info)
-database = ffa.football_players.Database(info)
-custom_players = custom.players_to_draft()
-previous_players = database.players_to_draft()
+oState = ffa.config.State(profile={'year': '2013'})
+oCustom = ffa.football_players.Artificial(oState)
+oDatabase = ffa.football_players.Database(oState)
+rank_engine = ffa.draft_rank.RunRanks(oState, oCustom)
 
-#draft = ffa.draft.Simulator(info.league, custom_players)
-rank_engine = ffa.draft_rank.PreRank(info, custom)
-rank_engine.get_pre_ranks()
+custom_players = oCustom.set_to_draft()
+previous_players = oDatabase.set_to_draft()
 
-tmp = ffa.report.ReportGen(info, rank_engine,name='TMP')
-tmp.update_pages()
-tmp.close_pages()
+#oCustom.plot_position_points()
+#atabase.plot_position_points()
+
+#rank_engine.roster_rank_page(page_name='RosterRankLinear2')
+rank_engine = ffa.draft_rank.RunRanks(oState, oDatabase)
+rank_engine.pps_rank_page(page_name='PPR2013')
+#rank_engine.roster_rank_page(page_name='Roster2013')
 
 print 'hello'
