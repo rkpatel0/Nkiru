@@ -123,26 +123,27 @@ class ReportGen(object):
         oPage = webpage.Data(self.path, info['pg_name'])
 
         # TODO: Clean up roster rank image!
-        plt.figure()
+        #plt.figure()
         df_plt = data['summary'].convert_objects().dropna().sort('pre')
         df_plt['pre'] = np.arange(len(df_plt)) + 1
-        df_plt.plot(x='pre', style='o')
-        plt.plot(df_plt['pre'], df_plt['pre'], 'k--')
-        plt.tight_layout()
-        plt.xlabel('Pre Rank Default')
-        plt.ylabel('Pre Rank by League Settings')
-        plt.title('Pre Rankings: Custom vs. Default')
+        #df_plt.plot(x='pre', style='o')
+        #plt.plot(df_plt['pre'], df_plt['pre'], 'k--')
+        #plt.tight_layout()
+        #plt.xlabel('Pre Rank Default')
+        #plt.ylabel('Pre Rank by League Settings')
+        #plt.title('Pre Rankings: Custom vs. Default')
 
-        f5 = df_plt.drop('pos', axis=1)
-        f5 = f5.set_index('pre')
+        #f5 = df_plt.drop('pos', axis=1)
+        #f5 = f5.set_index('pre')
 
-        for idx in f5.columns:
-            f5[idx] = f5[idx] - np.arange(len(f5)) - 1
+        #for idx in f5.columns:
+        #    f5[idx] = f5[idx] - np.arange(len(f5)) - 1
 
-        f6 = f5.std()
-        l_std = [idx + ': STD = ' + str(f6[idx].round(1)) for idx in f6.index]
-        plt.legend(l_std, loc='best')
-        fig = plt.gcf()
+        #f6 = f5.std()
+        #l_std = [idx + ': STD = ' + str(f6[idx].round(1)) for idx in f6.index]
+        #plt.legend(l_std, loc='best')
+        #fig = plt.gcf()
+
         url_path = self.PLOT_PATH + 'Summary_of_Results.png'
         data['fig_summary'].savefig(self.path + url_path)
 

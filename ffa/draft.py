@@ -44,12 +44,29 @@ class Simulator(object):
         players = self.players.copy()
         self.oResults = DraftResults(players.index)
 
+        self._system_check_before_draft(players)
         for name in self._draft_order:
             select = self._select_player(name, players)
             self.oResults._update(name, players.ix[select])
             players = players.drop(select)
 
         return(self.oResults.copy())
+
+    def _system_check_before_draft(self, players):
+        'Check players & settings have been properly initialized before draft'
+
+        # Check that team_pre_ranks match available player preranks
+        pre_rank_types = self.oLeague.team_info.ix['rank'].unique()
+        try:
+            players[pre_rank_types]
+        except KeyError:
+            msg = 'Player DF does not contain enough pre-rank cols'
+            raise KeyError(msg, players.columns, pre_rank_types)
+
+        # Check for sufficient # of players for draft
+        # Warning if Roster is not update to date this is useless...
+        if not self.oLeague.num_of_players == len(players):
+            raise ValueError('Not Enough Players for Roster * num_of_teams!')
 
     def _generate_draft_order(self):
         '''
@@ -69,21 +86,17 @@ class Simulator(object):
         '''
 
         profile = self.oLeague.team_info[name]
+        rank_type = profile['rank']
         playersAv = self._needed_players(name, players, self.oResults)
 
         if profile['strategy'] == 'max':
             options = playersAv.pts == playersAv.pts.max()
         elif profile['strategy'] == 'rank':
-            # TODO: then sory by desired rank (pre/vbd) --> Use a Try!!
-            try:
-                rank_type = profile['rank']
-                options = playersAv[rank_type] == playersAv[rank_type].min()
-            except KeyError:
-                raise KeyError('Cannot find desired pre-rank!')
+            options = playersAv[rank_type] == playersAv[rank_type].min()
         elif profile['strategy'] == 'user':
             options = self._user_select_player(name, playersAv)
         elif profile['strategy'] == 'search':
-            options = self._search_select_player(name, players)
+            options = self._search_select_player(name, players.sort(rank_type))
         else:
             raise ValueError('Unknown type of team strategy selected!\n')
 
@@ -240,7 +253,7 @@ class Simulator(object):
         options = players_av[players_av.pts == players_av.pts.max()]
 
         try:
-            # TODO: Search Random or Deterministic
+            # Does not need to be random but also does not hurt
             select = random.choice(options.index)
         except Exception:
             print players_av

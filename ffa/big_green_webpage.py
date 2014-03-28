@@ -88,7 +88,7 @@ class WriteHtml(object):
         self.TBL_ITEM = self.HTML_FMT.format(name='td')
         self.TBL_ROW = self.HTML_FMT.format(name='tr')
         self.TBL_NAME = self.HTML_FMT.format(name='table')
-        self.TEXT_FMT = self.HTML_FMT.format(name='p')
+        self.PRGH_FMT = self.HTML_FMT.format(name='p')
         self.LIST_FMT = self.HTML_FMT.format(name='li')
 
         self.TBL_DEFAULT = {
@@ -102,7 +102,7 @@ class WriteHtml(object):
     def text(self, text):
         'Convert basic test to html format'
 
-        text_html = self.TEXT_FMT % (text)
+        text_html = self.PRGH_FMT % (text)
         return(text_html)
 
     def link(self, url, name='Click Here'):
@@ -132,7 +132,7 @@ class WriteHtml(object):
 
         return(str_html)
 
-    def to_table_html(self, raw_html, info={}):
+    def format_html_table(self, raw_html, info={}):
         'Convert raw_html to standard table html'
 
         for key in self.TBL_DEFAULT.keys():
@@ -161,7 +161,7 @@ class WriteHtml(object):
         for idx in df.index:
             df_html += self.list_to_tablerow(df.ix[idx].tolist(), idx)
 
-        css_html = self.to_table_html(df_html, info)
+        css_html = self.format_html_table(df_html, info)
 
         return(css_html)
 

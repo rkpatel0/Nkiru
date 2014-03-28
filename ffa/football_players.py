@@ -48,10 +48,11 @@ class Player(object):
 
         # Apply standard configuration
         self.df.pts = self.df.pts.apply(np.round)
+        self.df['pre'] = self.df['pre'].rank()  # reset prerank - fill in gaps
         self.df = self.df.sort(columns='pre')
         self._set_bio()
 
-    def plot_position_points(self, save_path=''):
+    def plot_position_points(self, fig=False, sub=111):
 
         '''
         Plot pts (keep default order) by positon.  Must be called AFTER players
@@ -63,7 +64,9 @@ class Player(object):
         except NameError:
             raise NameError('Need to create players before plotting!')
 
-        plt.figure()
+        if not fig:
+            fig = plt.figure()
+
         for pos in all_pos:
             players = self.df.pts[self.df.pos == pos].copy()
             players.sort(ascending=False)
@@ -76,7 +79,7 @@ class Player(object):
         plt.title('Fantasy Points by Position')
         plt.tight_layout()
 
-        return(plt.gcf())
+        return(fig)
 
 
 class Artificial(Player):
@@ -391,5 +394,5 @@ class Database(Player):
 
         self.bio['data'] = df
         self.bio['header'] = 'Player Background'
-        self.bio['msg'] = info(year=self.oDatabase['year'],
+        self.bio['body'] = info(year=self.oDatabase['year'],
                                path=self.oDatabase['file'][0])

@@ -9,16 +9,18 @@ def main():
 
     info = ffa.config.State()
     oDatabase = ffa.football_players.Database(info)
-    database_players = oDatabase.set_to_draft()
+    oDatabase.set_to_draft()
     oDatabase.plot_position_points()
-    
-    draft = ffa.draft.Simulator(info.league, database_players)
+
+    draft = ffa.draft.Simulator(info.oLeague, oDatabase.df)
     draft.live_draft()
+    print oDatabase.df
+    print draft.oResults.df.sort('pick')
 
-    tmp = ffa.report.ReportGen(info, database_players, draft.results)
+#    tmp = ffa.report.ReportGen(info, oDatabase.df, draft.oResults)
 
-    tmp.update_pages()
-    tmp.close_pages()
+#    tmp.update_pages()
+#    tmp.close_pages()
 
     print 'do i get here'
 

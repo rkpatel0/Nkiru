@@ -34,13 +34,23 @@ class State(object):
     this method may no longer suffice.
     '''
 
-    def __init__(self, league={}, profile={}):
+    def __init__(self, league={}, database={}, custom={}):
         '''
         Pass desired oDatabase when initializing otherwise use internal default.
         '''
 
         self.oLeague = League(league)
-        self.oProfile = Profile(profile)
+        self.oProfile = Profile(database, custom)
+
+    def setup(self, league={}, database={}, custom={}):
+        '''
+        Pass arguments in as: **settings
+        - Where settings is a dict that gets unpacked and passed down below
+        - Only need to call this after State has been defined (little messy)
+        '''
+
+        self.oLeague.setup(league)
+        self.oProfile.setup(database, custom)
 
 
 class Profile:
@@ -108,7 +118,7 @@ class Profile:
                 self.player_database[key] = self.PLAYERS_DATABASE_DEFAULT[key]
 
         for key in self.PLAYERS_CUSTOM_DEFAULT.keys():
-            if key not in oDatabase:
+            if key not in oCustom:
                 self.player_custom[key] = self.PLAYERS_CUSTOM_DEFAULT[key]
 
 
@@ -119,13 +129,13 @@ class League:
     parameters directly [need to change this]
     '''
 
-    def __init__(self, oDatabase={}):
+    def __init__(self, league={}):
         '''
         General object setup.
         '''
 
         self._set_default()
-        self.setup(oDatabase)
+        self.setup(league)
 
     def _set_default(self):
         '''
@@ -136,8 +146,8 @@ class League:
 
         roster = {
                   'QB': 1,
-                  'RB': 3,
-                  'WR': 3,
+                  'RB': 0,
+                  'WR': 0,
                   'TE': 1,
                   }
 
@@ -157,17 +167,17 @@ class League:
         # This becomes a dataframe
         pro_idx = ['strategy', 'tie', 'rank']
         profile = collections.OrderedDict([
-                   # Team   Strat      Tie     Pre-Rank
-                   ('A0', ['rank'  , 'rand', 'default']),
-                   ('B1', ['search', 'rand', 'default']),
-                   ('C2', ['rank'  , 'rand', 'default']),
-                   ('D3', ['rank'  , 'rand', 'default']),
-                   ('E4', ['rank'  , 'rand', 'default']),
-                   ('F5', ['rank'  , 'rand', 'default']),
-                   ('G6', ['rank'  , 'rand', 'default']),
-                   ('H7', ['rank'  , 'rand', 'default']),
-                   ('I8', ['rank'  , 'rand', 'default']),
-                   ('J9', ['rank'  , 'rand', 'default']),
+                   # Team   Strat      Tie     rank
+                   ('A0', ['rank'  , 'rand', 'pre']),
+                   ('B1', ['rank'  , 'rand', 'pre']),
+                   ('C2', ['rank'  , 'rand', 'pre']),
+                   ('D3', ['rank'  , 'rand', 'pre']),
+                   ('E4', ['rank'  , 'rand', 'pre']),
+                   ('F5', ['rank'  , 'rand', 'pre']),
+                   ('G6', ['rank'  , 'rand', 'pre']),
+                   ('H7', ['rank'  , 'rand', 'pre']),
+                   ('I8', ['rank'  , 'rand', 'pre']),
+                   ('J9', ['rank'  , 'rand', 'pre']),
                    #('K10', ['rank'  , 'rand', 'default']),
                    #('L11', ['rank'  , 'rand', 'default']),
                    ])
@@ -180,28 +190,31 @@ class League:
     def setup(self, oDatabase={}):
         '''
         Defines some constant parameters based off of parameters for league.
+        It is vital that this functiong gets called ANYTIME any league settings
+        get modified otherwise the below variables will be out of date.
         '''
 
+        # For insufficient data passed in - below will append default settings
         for key in self.DEFAULT_SETTINGS.keys():
             if key not in oDatabase:
                 oDatabase[key] = self.DEFAULT_SETTINGS[key]
 
-        # TODO: Below should all be caught by an exception...
+        # Load League Settings
         self.roster = oDatabase['roster']
         self.pts_per_stat = oDatabase['stat_pts']
         self.team_info = oDatabase['profile']
 
-        # League Dependent Variables
+        # Compute commonly used variables
         self.num_of_teams = len(self.team_info.columns)
         self.rounds = sum(self.roster.values())
         self.num_of_players = self.num_of_teams * self.rounds
         self.positions = self.roster.keys()
         self.team_names = self.team_info.columns.tolist()
 
-    def copy_team_info(self):
+    def copy(self):
         '''
         Return a deep copy of teams info.  Could just do this inside each
         module but this feels cleaner if this function is used frequently.
         '''
 
-        return(copy.deepcopy(self.team_info))
+        return(copy.deepcopy(self))

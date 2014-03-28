@@ -11,8 +11,8 @@ rank_engine = ffa.draft_rank.RunRanks(info, oCustom)
 custom_players = oCustom.set_to_draft()
 oCustom.plot_position_points()
 previous_players = oDatabase.set_to_draft()
-rank_engine.roster_rank_page(page_name='RosterRankLinear')
+rank_engine.roster_report(page_name='RosterRankLinear')
 
 #rank_engine = ffa.draft_rank.RunRanks(info, oDatabase)
-#rank_engine.roster_rank_page(page_name='RosterRankDatabase')
+#rank_engine.roster_report(page_name='RosterRankDatabase')
 print 'hello'
